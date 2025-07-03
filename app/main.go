@@ -20,12 +20,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer l.Close()
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for true {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		defer conn.Close()
+		go handleConnection(conn)
 	}
-	defer conn.Close()
+}
+func handleConnection(conn net.Conn) {
 	for true {
 		scanner := bufio.NewScanner(conn)
 		if scanner.Scan() {

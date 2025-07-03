@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
@@ -18,12 +19,17 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
+	defer l.Close()
 	conn, err := l.Accept()
-	l.Close()
-	defer conn.Close()
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	conn.Write([]byte("+PONG\r\n"))
+	defer conn.Close()
+	for true {
+		scanner := bufio.NewScanner(conn)
+		if scanner.Scan() {
+			conn.Write([]byte("+PONG\r\n"))
+		}
+	}
 }

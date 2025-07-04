@@ -42,34 +42,49 @@ func handleConnection(conn net.Conn) {
 
 	reader := bufio.NewReader(conn)
 	for {
-		line, err := reader.ReadString('\n')
-		var command []string
-
+		command, err := readCommand(reader)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-
-		if strings.HasSuffix(line, "\r\n") {
-			matches := numberRegex.FindAllString(line, -1)
-			if len(matches) <= 0 {
-				return
-			}
-			noOfLines, _ := strconv.Atoi(matches[0])
-			for range noOfLines {
-				str, err := readBulkString(reader)
-				if err != nil {
-					fmt.Println(err)
-					command = nil
-					return
-				}
-				command = append(command, str)
-			}
-			fmt.Println(command)
-			conn.Write([]byte("+PONG\r\n"))
-		}
+		fmt.Println(command)
+		proccessCommand(conn, &command)
 	}
 }
+
+var numberRegex = regexp.MustCompile(`\d+`)
+
+func readCommand(reader *bufio.Reader) ([]string, error) {
+	line, err := reader.ReadString('\n')
+	var command []string
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	if strings.HasSuffix(line, "\r\n") {
+		matches := numberRegex.FindAllString(line, -1)
+		if len(matches) <= 0 {
+			return nil, errors.New("Invalid Format")
+		}
+		noOfLines, _ := strconv.Atoi(matches[0])
+		for range noOfLines {
+			str, err := readBulkString(reader)
+			if err != nil {
+				fmt.Println(err)
+				command = nil
+				return nil, err
+			}
+			command = append(command, str)
+		}
+	}
+	if len(command) <= 0 {
+		return nil, errors.New("Invalid Format")
+	}
+
+	return command, nil
+}
+
 func readBulkString(reader *bufio.Reader) (string, error) {
 	var command string
 
@@ -93,12 +108,15 @@ func readBulkString(reader *bufio.Reader) (string, error) {
 		if noOfBytes < 0 || noOfBytes > MaxBulkStringSize {
 			return "", errors.New("Bulk string too large")
 		}
+
 		// the two bytes of \r\n
 		noOfBytes += 2
 
 		//read command
 		buf := make([]byte, noOfBytes)
+
 		n, err := reader.Read(buf)
+
 		if err != nil || n != noOfBytes {
 			fmt.Println(err)
 			return "", errors.New("Invalid Format")
@@ -111,4 +129,24 @@ func readBulkString(reader *bufio.Reader) (string, error) {
 	return command, nil
 }
 
-var numberRegex = regexp.MustCompile(`\d+`)
+func proccessCommand(conn net.Conn, command *[]string) {
+	if len(*command) <= 0 {
+		return
+	}
+	c := strings.ToLower((*command)[0])
+	switch c {
+	case "echo":
+		if len(*command) > 1 {
+			l := strconv.Itoa(len((*command)[1]))
+			str := "$" + l + "\r\n" + ((*command)[1]) + "\r\n"
+			conn.Write([]byte(str))
+		} else {
+			fmt.Println("test")
+			conn.Write([]byte("*-1\r\n"))
+
+		}
+	default:
+		conn.Write([]byte("+PONG\r\n"))
+	}
+
+}

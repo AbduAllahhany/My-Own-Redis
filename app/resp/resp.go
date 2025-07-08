@@ -11,6 +11,7 @@ const (
 	BulkString   = '$'
 	Array        = '*'
 	CLRF         = "\r\n"
+	Null         = "$-1\r\n"
 )
 
 type Decoder interface {

@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"net"
 	"strconv"
 	"strings"
-
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 var (
@@ -26,6 +25,7 @@ type Command struct {
 }
 
 func Read(reader *bufio.Reader) (Command, error) {
+	//first line
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return Command{}, err
@@ -34,15 +34,13 @@ func Read(reader *bufio.Reader) (Command, error) {
 		return Command{}, ErrInvalidFormat
 	}
 	var parts []string
-
 	if strings.HasSuffix(line, resp.CLRF) && line[0] == resp.Array {
 		noOfParts, err := readNumbersFromLine(line)
 		if err != nil {
-			return Command{}, err
-		}
-
-		if noOfParts < 0 {
 			return Command{}, ErrInvalidLength
+		}
+		if noOfParts < 0 {
+			return Command{}, ErrInvalidFormat
 		}
 
 		if noOfParts == 0 {
@@ -85,7 +83,7 @@ func parseCommand(parts []string) (Command, error) {
 
 func readBulkString(reader *bufio.Reader) (string, error) {
 
-	//byte line
+	//first line
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
@@ -113,7 +111,7 @@ func readBulkString(reader *bufio.Reader) (string, error) {
 		buf := make([]byte, noOfBytes)
 		n, err := reader.Read(buf)
 		if n != noOfBytes {
-			return "", ErrInvalidFormat
+			return "", ErrInvalidLength
 		}
 		if err != nil {
 			return "", ErrInvalidFormat
@@ -138,24 +136,20 @@ func readNumbersFromLine(line string) (int, error) {
 	return n, nil
 }
 
-func Proccess(conn net.Conn, command *[]string) {
-	if len(*command) <= 0 {
-		return
-	}
-	c := strings.ToLower((*command)[0])
-	switch c {
+func (cmd Command) Process(conn net.Conn, mp *map[string]any) {
+	cmdName := strings.ToLower(cmd.Name)
+	str := resp.Null
+	switch cmdName {
 	case "echo":
-		if len(*command) > 1 {
-			l := strconv.Itoa(len((*command)[1]))
-			str := "$" + l + "\r\n" + ((*command)[1]) + "\r\n"
-			conn.Write([]byte(str))
-		} else {
-			fmt.Println("test")
-			conn.Write([]byte("*-1\r\n"))
+		d := resp.SimpleStringDecoder{}
+		str = d.Decode(cmd.Args[0])
+	case "set":
+		(*mp)[cmd.Args[0]] = cmd.Args[1]
+	case "get":
 
-		}
 	default:
-		conn.Write([]byte("+PONG\r\n"))
+		str = resp.Null
 	}
 
+	conn.Write([]byte(str))
 }

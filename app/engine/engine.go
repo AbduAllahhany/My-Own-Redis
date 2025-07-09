@@ -63,3 +63,18 @@ func Get(store *DbStore, args []string) []byte {
 	str := x.(string)
 	return resp.SimpleStringDecoder(str)
 }
+
+// server commands
+func Echo(store *DbStore, args []string) []byte {
+	if len(args) != 1 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	return resp.BulkStringDecoder(args[0])
+}
+
+func Ping(store *DbStore, args []string) []byte {
+	if len(args) != 0 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	return resp.SimpleStringDecoder("PONG")
+}

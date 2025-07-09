@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"net"
 	"strconv"
 	"strings"
 )
@@ -19,9 +19,17 @@ var (
 
 const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
+type HandlerCmd func(store *engine.DbStore, args []string) []byte
+
+var lookUpCommands = map[string]HandlerCmd{
+	"get": engine.Get,
+	"set": engine.Set,
+}
+
 type Command struct {
-	Name string
-	Args []string
+	Name   string
+	Args   []string
+	handle HandlerCmd
 }
 
 func Read(reader *bufio.Reader) (Command, error) {
@@ -73,7 +81,8 @@ func parseCommand(parts []string) (Command, error) {
 		return Command{}, ErrEmptyCommand
 	}
 	cmd := Command{
-		Name: parts[0],
+		Name:   parts[0],
+		handle: lookUpCommands[parts[0]],
 	}
 	if len(parts) > 1 {
 		cmd.Args = parts[1:]
@@ -136,20 +145,16 @@ func readNumbersFromLine(line string) (int, error) {
 	return n, nil
 }
 
-func (cmd Command) Process(conn net.Conn, mp *map[string]any) {
-	cmdName := strings.ToLower(cmd.Name)
-	str := resp.Null
-	switch cmdName {
-	case "echo":
-		d := resp.SimpleStringDecoder{}
-		str = d.Decode(cmd.Args[0])
-	case "set":
-		(*mp)[cmd.Args[0]] = cmd.Args[1]
-	case "get":
-
-	default:
-		str = resp.Null
+func (cmd Command) Process(store *engine.DbStore) []byte {
+	handler := cmd.handle
+	if handler == nil {
+		return []byte(resp.Null)
 	}
+	out := handler(store, cmd.Args)
+	return out
+}
 
-	conn.Write([]byte(str))
+func Init() {
+	lookUpCommands["set"] = engine.Set
+	lookUpCommands["get"] = engine.Get
 }

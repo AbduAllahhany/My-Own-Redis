@@ -14,34 +14,18 @@ const (
 	Null         = "$-1\r\n"
 )
 
-type Decoder interface {
+func SimpleStringDecoder(str string) []byte {
+	return []byte(string(SimpleString) + str + CLRF)
 }
-
-type SimpleStringDecoder struct {
+func BulkStringDecoder(str string) []byte {
+	return []byte(string(BulkString) + strconv.Itoa(len(str)) + CLRF + str + CLRF)
 }
-type BulkStringDecoder struct {
+func ErrorDecoder(str string) []byte {
+	return []byte(string(Error) + str + CLRF)
 }
-type ErrorDecoder struct {
+func IntegerDecoder(num string) []byte {
+	return []byte(string(Integer) + num + CLRF)
 }
-type IntegerDecoder struct {
-}
-type ArrayDecoder struct {
-}
-
-func (d SimpleStringDecoder) Decode(str string) string {
-	return string(SimpleString) + str + CLRF
-}
-func (d BulkStringDecoder) Decode(str string) string {
-	return string(BulkString) + strconv.Itoa(len(str)) + CLRF + str + CLRF
-}
-
-func (d ErrorDecoder) Decode(str string) string {
-	return string(Error) + str + CLRF
-}
-func (d IntegerDecoder) Decode(num int) string {
-	return string(Integer) + strconv.Itoa(num) + CLRF
-}
-
-func (d ArrayDecoder) Decode(arr []any) string {
-	return ""
+func ArrayDecoder(arr []any) []byte {
+	return nil
 }

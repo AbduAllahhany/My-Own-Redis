@@ -56,7 +56,7 @@ func Get(store *DbStore, args []string) []byte {
 	if obj == nil {
 		return []byte(resp.Null)
 	}
-	if strings.ToUpper(obj.Type()) != "string" {
+	if strings.ToUpper(obj.Type()) != "STRING" {
 		return resp.ErrorDecoder("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 	x := obj.Value()

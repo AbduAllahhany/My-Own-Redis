@@ -21,7 +21,7 @@ type RedisString struct {
 }
 
 func (r RedisString) Type() string {
-	return "string"
+	return "STRING"
 }
 func (r RedisString) Value() interface{} {
 	return r.data
@@ -32,7 +32,7 @@ type RedisList struct {
 }
 
 func (r RedisList) Type() string {
-	return "list"
+	return "LIST"
 }
 
 // string command
@@ -56,7 +56,7 @@ func Get(store *DbStore, args []string) []byte {
 	if obj == nil {
 		return []byte(resp.Null)
 	}
-	if strings.ToLower(obj.Type()) != "string" {
+	if strings.ToUpper(obj.Type()) != "string" {
 		return resp.ErrorDecoder("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 	x := obj.Value()

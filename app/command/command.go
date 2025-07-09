@@ -22,8 +22,8 @@ const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 type HandlerCmd func(store *engine.DbStore, args []string) []byte
 
 var lookUpCommands = map[string]HandlerCmd{
-	"get": engine.Get,
-	"set": engine.Set,
+	"GET": engine.Get,
+	"SET": engine.Set,
 }
 
 type Command struct {
@@ -82,7 +82,7 @@ func parseCommand(parts []string) (Command, error) {
 	}
 	cmd := Command{
 		Name:   parts[0],
-		handle: lookUpCommands[parts[0]],
+		handle: lookUpCommands[strings.ToUpper(parts[0])],
 	}
 	if len(parts) > 1 {
 		cmd.Args = parts[1:]

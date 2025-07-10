@@ -35,7 +35,6 @@ func main() {
 		Dict: make(map[string]engine.RedisObj),
 		Mu:   sync.RWMutex{},
 	}
-	command.Init()
 	for {
 		conn, err := l.Accept()
 		serv := server{

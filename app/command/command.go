@@ -155,8 +155,3 @@ func (cmd Command) Process(store *engine.DbStore) []byte {
 	out := handler(store, cmd.Args)
 	return out
 }
-
-func Init() {
-	lookUpCommands["set"] = engine.Set
-	lookUpCommands["get"] = engine.Get
-}

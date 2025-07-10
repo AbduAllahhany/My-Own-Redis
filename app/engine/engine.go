@@ -69,7 +69,7 @@ func (r RedisList) Type() string {
 // [GET]
 // [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
 func Set(store *DbStore, args []string) []byte {
-	if len(args) <= 2 || len(args) > 5 {
+	if len(args) < 2 || len(args) > 5 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	mu := store.Mu

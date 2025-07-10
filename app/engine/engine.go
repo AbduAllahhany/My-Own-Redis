@@ -82,7 +82,7 @@ func Set(store *DbStore, args []string) []byte {
 	//optional
 	exIndex := IndexOf(args, "EX")
 	pxIndex := IndexOf(args, "PX")
-	var ttl time.Duration
+	var ttl time.Duration = 1<<63 - 1
 	if exIndex != -1 && pxIndex == -1 {
 		amount, err := strconv.Atoi(args[exIndex+1])
 		if err != nil {

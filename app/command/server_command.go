@@ -1,0 +1,44 @@
+package command
+
+import (
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
+	"strings"
+)
+
+// Server commands
+func Echo(serv *server.Server, args []string) []byte {
+	if len(args) != 1 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	return resp.BulkStringDecoder(args[0])
+}
+func Ping(serv *server.Server, args []string) []byte {
+	if len(args) != 0 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	return resp.SimpleStringDecoder("PONG")
+}
+
+// Config
+func Config(serv *server.Server, args []string) []byte {
+	if strings.ToUpper(args[0]) == "GET" {
+		return configGet(serv, args[1:])
+	}
+
+	return []byte(resp.Nil)
+}
+func configGet(serv *server.Server, args []string) []byte {
+	if len(args) == 0 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	var arr []string
+	for _, arg := range args {
+		val, ok := server.ConfigLookup[arg]
+		if ok {
+			arr = append(arr, arg)
+			arr = append(arr, val)
+		}
+	}
+	return resp.ArrayDecoder(arr)
+}

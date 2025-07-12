@@ -1,6 +1,7 @@
 package resp
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -11,7 +12,7 @@ const (
 	BulkString   = '$'
 	Array        = '*'
 	CLRF         = "\r\n"
-	Null         = "$-1\r\n"
+	Nil          = "$-1\r\n"
 )
 
 func SimpleStringDecoder(str string) []byte {
@@ -26,6 +27,11 @@ func ErrorDecoder(str string) []byte {
 func IntegerDecoder(num string) []byte {
 	return []byte(string(Integer) + num + CLRF)
 }
-func ArrayDecoder(arr []any) []byte {
-	return nil
+func ArrayDecoder(arr []string) []byte {
+	out := string(Array) + strconv.Itoa(len(arr)) + CLRF
+	for _, str := range arr {
+		out += string(BulkStringDecoder(str))
+	}
+	fmt.Println(out)
+	return []byte(out)
 }

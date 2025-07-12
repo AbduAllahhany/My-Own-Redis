@@ -4,21 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/command"
-	"github.com/codecrafters-io/redis-starter-go/app/engine"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"io"
 	"net"
 	"os"
-	"sync"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
 var _ = net.Listen
 var _ = os.Exit
-
-type server struct {
-	db   engine.DbStore
-	conn net.Conn
-}
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -29,27 +23,19 @@ func main() {
 		os.Exit(1)
 	}
 	defer l.Close()
-
-	//create data store instance
-	db := engine.DbStore{
-		Dict: make(map[string]engine.RedisObj),
-		Mu:   sync.RWMutex{},
-	}
+	cfg := server.NewConfiguration()
+	fmt.Println(cfg)
+	serv := server.NewServer(cfg)
 	for {
 		conn, err := l.Accept()
-		serv := server{
-			db:   db,
-			conn: conn,
-		}
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConnection(&serv)
+		go handleConnection(conn, serv)
 	}
 }
-func handleConnection(serv *server) {
-	conn := serv.conn
+func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
@@ -62,10 +48,8 @@ func handleConnection(serv *server) {
 		if err != nil {
 			fmt.Println(err)
 		}
-
-		out := cmd.Process(&serv.db)
+		out := cmd.Process(serv)
 		conn.Write(out)
 		fmt.Println(cmd)
-
 	}
 }

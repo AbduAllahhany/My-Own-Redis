@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"strconv"
 	"strings"
 )
@@ -19,13 +19,15 @@ var (
 
 const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
-type HandlerCmd func(store *engine.DbStore, args []string) []byte
+type HandlerCmd func(serv *server.Server, args []string) []byte
 
+// Register command
 var lookUpCommands = map[string]HandlerCmd{
-	"SET":  engine.Set,
-	"GET":  engine.Get,
-	"ECHO": engine.Echo,
-	"PING": engine.Ping,
+	"SET":    Set,
+	"GET":    Get,
+	"ECHO":   Echo,
+	"PING":   Ping,
+	"CONFIG": Config,
 }
 
 type Command struct {
@@ -77,6 +79,16 @@ func Read(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
+func (cmd Command) Process(serv *server.Server) []byte {
+	handler := cmd.handle
+	if handler == nil {
+		return []byte(resp.Nil)
+	}
+	out := handler(serv, cmd.Args)
+	return out
+}
+
+//helper function
 
 func parseCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
@@ -145,13 +157,4 @@ func readNumbersFromLine(line string) (int, error) {
 		return -1, err
 	}
 	return n, nil
-}
-
-func (cmd Command) Process(store *engine.DbStore) []byte {
-	handler := cmd.handle
-	if handler == nil {
-		return []byte(resp.Null)
-	}
-	out := handler(store, cmd.Args)
-	return out
 }

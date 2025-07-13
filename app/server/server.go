@@ -21,7 +21,7 @@ type Server struct {
 
 func NewServer(config Config) *Server {
 	//create data store instance
-	path := config.Dir + config.DbFilename
+	path := config.Dir + "/" + config.DbFilename
 	dict := rdb.Encode(path)
 	db := engine.DbStore{
 		Dict: dict,

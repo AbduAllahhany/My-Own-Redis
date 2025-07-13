@@ -30,7 +30,7 @@ func (r RedisString) Type() string {
 }
 func (r RedisString) Value() interface{} {
 	expiration := r.Expiration
-	if expiration.Compare(time.Now()) >= 0 {
+	if expiration.Compare(time.Now()) >= 0 || expiration.IsZero() {
 		return r.Data
 	}
 	return nil

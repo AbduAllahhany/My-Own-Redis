@@ -47,7 +47,7 @@ func Set(serv *server.Server, args []string) []byte {
 	//optional
 	exIndex := IndexOf(args, "EX")
 	pxIndex := IndexOf(args, "PX")
-	var ttl time.Duration = 1<<63 - 1
+	var ttl time.Duration
 	if exIndex != -1 && pxIndex == -1 {
 		amount, err := strconv.Atoi(args[exIndex+1])
 		if err != nil {
@@ -61,10 +61,13 @@ func Set(serv *server.Server, args []string) []byte {
 		}
 		ttl = expirationOptions[strings.ToUpper(args[pxIndex])] * time.Duration(amount)
 	}
-
+	var ex time.Time
+	if ttl != 0 {
+		ex = time.Now().Add(ttl)
+	}
 	dict[key] = engine.RedisString{
 		Data:       value,
-		Expiration: time.Now().Add(ttl),
+		Expiration: ex,
 	}
 
 	if Contains(args, "GET") {

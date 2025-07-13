@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/hdt3213/rdb/parser"
-	"log"
 	"os"
 	"time"
 )
@@ -35,7 +34,7 @@ func Encode(path string) map[string]engine.RedisObj {
 		return true
 	})
 	if err != nil {
-		log.Fatal("Parse error:", err)
+		fmt.Println(err)
 	}
 
 	return dict

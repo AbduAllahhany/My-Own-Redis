@@ -28,6 +28,7 @@ var lookUpCommands = map[string]HandlerCmd{
 	"ECHO":   Echo,
 	"PING":   Ping,
 	"CONFIG": Config,
+	"KEYS":   Keys,
 }
 
 type Command struct {

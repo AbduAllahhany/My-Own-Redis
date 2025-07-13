@@ -3,6 +3,7 @@ package command
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,4 +42,28 @@ func configGet(serv *server.Server, args []string) []byte {
 		}
 	}
 	return resp.ArrayDecoder(arr)
+}
+
+// Blocking function
+func Keys(serv *server.Server, args []string) []byte {
+	if len(args) != 1 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	store := serv.Db
+	dict := store.Dict
+	mu := store.Mu
+	mu.Lock()
+	defer mu.Unlock()
+	pattern := args[0]
+	var matches []string
+	for key, _ := range dict {
+		match, err := filepath.Match(pattern, key)
+		if err != nil {
+			return resp.ErrorDecoder("ERR encoding")
+		}
+		if match {
+			matches = append(matches, key)
+		}
+	}
+	return resp.ArrayDecoder(matches)
 }

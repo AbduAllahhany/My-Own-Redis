@@ -1,7 +1,6 @@
 package resp
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -32,6 +31,5 @@ func ArrayDecoder(arr []string) []byte {
 	for _, str := range arr {
 		out += string(BulkStringDecoder(str))
 	}
-	fmt.Println(out)
 	return []byte(out)
 }

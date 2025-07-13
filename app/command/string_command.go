@@ -79,6 +79,9 @@ func Get(serv *server.Server, args []string) []byte {
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
+	mu := store.Mu
+	mu.Lock()
+	defer mu.Unlock()
 	dict := store.Dict
 	obj := dict[args[0]]
 	if obj == nil {

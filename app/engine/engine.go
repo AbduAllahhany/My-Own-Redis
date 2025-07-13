@@ -15,9 +15,8 @@ type RedisObj interface {
 	Value() interface{}
 }
 type RedisString struct {
-	Data         string
-	CreationTime time.Time
-	TTL          time.Duration
+	Data       string
+	Expiration time.Time
 }
 type RedisList struct {
 	data []string
@@ -30,9 +29,8 @@ func (r RedisString) Type() string {
 	return "STRING"
 }
 func (r RedisString) Value() interface{} {
-	//	creation + ttl >= now
-	t := r.CreationTime.Add(r.TTL)
-	if t.Compare(time.Now()) >= 0 {
+	expiration := r.Expiration
+	if expiration.Compare(time.Now()) >= 0 {
 		return r.Data
 	}
 	return nil

@@ -24,7 +24,7 @@ func main() {
 	}
 	defer l.Close()
 	cfg := server.NewConfiguration()
-	fmt.Println(cfg)
+
 	serv := server.NewServer(cfg)
 	for {
 		conn, err := l.Accept()

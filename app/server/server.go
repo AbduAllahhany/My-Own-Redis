@@ -3,6 +3,7 @@ package server
 import (
 	"flag"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"sync"
 )
 
@@ -20,8 +21,10 @@ type Server struct {
 
 func NewServer(config Config) *Server {
 	//create data store instance
+	path := config.Dir + config.DbFilename
+	dict := rdb.Encode(path)
 	db := engine.DbStore{
-		Dict: make(map[string]engine.RedisObj),
+		Dict: dict,
 		Mu:   sync.RWMutex{},
 	}
 	ConfigLookup = configToMap(config)
@@ -36,9 +39,7 @@ func NewServer(config Config) *Server {
 func NewConfiguration() Config {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
-
 	flag.Parse()
-
 	return Config{
 		Dir:        *dir,
 		DbFilename: *dbfilename,

@@ -63,9 +63,8 @@ func Set(serv *server.Server, args []string) []byte {
 	}
 
 	dict[key] = engine.RedisString{
-		Data:         value,
-		CreationTime: time.Now(),
-		TTL:          ttl,
+		Data:       value,
+		Expiration: time.Now().Add(ttl),
 	}
 
 	if Contains(args, "GET") {

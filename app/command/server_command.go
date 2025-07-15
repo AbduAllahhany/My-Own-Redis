@@ -23,6 +23,9 @@ func Ping(serv *server.Server, args []string) []byte {
 
 // Config
 func Config(serv *server.Server, args []string) []byte {
+	if len(args) == 0 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
 	if strings.ToUpper(args[0]) == "GET" {
 		return configGet(serv, args[1:])
 	}

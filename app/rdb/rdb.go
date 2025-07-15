@@ -10,13 +10,13 @@ import (
 
 func Encode(path string) map[string]engine.RedisObj {
 	rdbFile, err := os.Open(path)
+	dict := make(map[string]engine.RedisObj)
 	if err != nil {
-		fmt.Println(err)
+		return dict
 	}
 	defer func() {
 		_ = rdbFile.Close()
 	}()
-	dict := make(map[string]engine.RedisObj)
 	decoder := parser.NewDecoder(rdbFile)
 	err = decoder.Parse(func(o parser.RedisObject) bool {
 		switch o.GetType() {
@@ -36,6 +36,5 @@ func Encode(path string) map[string]engine.RedisObj {
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	return dict
 }

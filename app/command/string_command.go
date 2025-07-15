@@ -39,7 +39,6 @@ func Set(serv *server.Server, args []string) []byte {
 	}
 	mu := store.Mu
 	mu.Lock()
-	defer mu.Unlock()
 	dict := store.Dict
 	key := args[0]
 	value := args[1]
@@ -69,6 +68,7 @@ func Set(serv *server.Server, args []string) []byte {
 		Data:       value,
 		Expiration: ex,
 	}
+	mu.Unlock()
 
 	if Contains(args, "GET") {
 		return Get(serv, []string{
@@ -83,8 +83,8 @@ func Get(serv *server.Server, args []string) []byte {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	mu := store.Mu
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	dict := store.Dict
 	obj := dict[args[0]]
 	if obj == nil {

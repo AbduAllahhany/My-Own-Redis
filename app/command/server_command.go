@@ -76,13 +76,13 @@ func Info(serv *server.Server, args []string) []byte {
 	}
 	if strings.ToUpper(args[0]) == "REPLICATION" {
 
-		out := []string{"#REPLICATION"}
+		out := "#REPLICATION" + resp.CLRF
 		if serv.Role == server.Master {
-			out = append(out, "role:master")
-			return resp.ArrayDecoder(out)
+			out += "role:master" + resp.CLRF
+			return resp.BulkStringDecoder(out)
 		} else if serv.Role == server.Slave {
-			out = append(out, "role:slave")
-			return resp.ArrayDecoder(out)
+			out += "role:slave" + resp.CLRF
+			return resp.BulkStringDecoder(out)
 		}
 	}
 	return resp.ErrorDecoder("ERR syntax error")

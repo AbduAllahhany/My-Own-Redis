@@ -80,7 +80,7 @@ func NewConfiguration() Config {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
 	port := flag.String("port", "6379", "Port")
-	replica := flag.String("replicaof", "0.0.0.0 0", "Is Replica")
+	replica := flag.String("replicaof", "Bad Address", "Is Replica")
 	flag.Parse()
 	return Config{
 		Dir:        *dir,

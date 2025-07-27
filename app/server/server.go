@@ -1,11 +1,12 @@
 package server
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
-	"github.com/google/uuid"
+	"math/big"
 	"net"
 	"strings"
 	"sync"
@@ -24,7 +25,7 @@ type Config struct {
 	Port       string
 	MasterInfo string
 }
-type Replica struct {
+type Node struct {
 	Id   string
 	Port int
 	Ip   net.IP
@@ -35,7 +36,8 @@ type Server struct {
 	Configuration    Config
 	Listener         net.Listener
 	Role             string
-	ConnectedReplica []Replica
+	ConnectedReplica []Node
+	ConnectedMaster  []Node
 }
 
 func NewServer(config Config) (*Server, error) {
@@ -65,7 +67,7 @@ func NewServer(config Config) (*Server, error) {
 	}
 
 	serv := Server{
-		Id:               uuid.New().String(),
+		Id:               generateID(),
 		Db:               db,
 		Configuration:    config,
 		Listener:         l,
@@ -95,4 +97,18 @@ func configToMap(config Config) map[string]string {
 		"dir":        config.Dir,
 		"dbfilename": config.DbFilename,
 	}
+}
+
+func generateID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 40
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return ""
+		}
+		result[i] = charset[num.Int64()]
+	}
+	return string(result)
 }

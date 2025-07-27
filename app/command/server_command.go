@@ -79,6 +79,8 @@ func Info(serv *server.Server, args []string) []byte {
 		out := "#REPLICATION" + resp.CLRF
 		if serv.Role == server.Master {
 			out += "role:master" + resp.CLRF
+			out += "master_replid:" + serv.Id + resp.CLRF
+			out += "master_repl_offset:0" + resp.CLRF
 			return resp.BulkStringDecoder(out)
 		} else if serv.Role == server.Slave {
 			out += "role:slave" + resp.CLRF

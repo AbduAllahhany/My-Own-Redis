@@ -4,8 +4,16 @@ import (
 	"flag"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/google/uuid"
 	"net"
 	"sync"
+)
+
+var ConfigLookup map[string]string
+
+const (
+	Master = "MASTER"
+	Slave  = "SLAVE"
 )
 
 type Config struct {
@@ -13,13 +21,18 @@ type Config struct {
 	DbFilename string
 	Port       string
 }
-
-var ConfigLookup map[string]string
-
+type Replica struct {
+	Id   string
+	Port int
+	Ip   net.IP
+}
 type Server struct {
-	Db            engine.DbStore
-	Configuration Config
-	Listener      net.Listener
+	Id               string
+	Db               engine.DbStore
+	Configuration    Config
+	Listener         net.Listener
+	Role             string
+	ConnectedReplica []Replica
 }
 
 func NewServer(config Config) (*Server, error) {
@@ -36,9 +49,12 @@ func NewServer(config Config) (*Server, error) {
 		return nil, err
 	}
 	serv := Server{
-		Db:            db,
-		Configuration: config,
-		Listener:      l,
+		Id:               uuid.New().String(),
+		Db:               db,
+		Configuration:    config,
+		Listener:         l,
+		Role:             Master,
+		ConnectedReplica: nil,
 	}
 
 	return &serv, nil

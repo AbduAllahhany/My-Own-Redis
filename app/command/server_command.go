@@ -70,3 +70,20 @@ func Keys(serv *server.Server, args []string) []byte {
 	}
 	return resp.ArrayDecoder(matches)
 }
+func Info(serv *server.Server, args []string) []byte {
+	if len(args) != 1 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	if strings.ToUpper(args[0]) == "REPLICATION" {
+
+		out := []string{"#REPLICATION"}
+		if serv.Role == server.Master {
+			out = append(out, "role:master")
+			return resp.ArrayDecoder(out)
+		} else if serv.Role == server.Slave {
+			out = append(out, "role:slave")
+			return resp.ArrayDecoder(out)
+		}
+	}
+	return resp.ErrorDecoder("ERR syntax error")
+}

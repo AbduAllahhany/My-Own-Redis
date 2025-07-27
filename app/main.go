@@ -10,9 +10,12 @@ import (
 	"os"
 )
 
-//Memory Optimization
-//Connection pool
-//Testing
+//Todo
+//1)Testing
+//2)Implement my own rdb reader
+//2)Memory Optimization
+//3)Connection pool
+//4)Logging
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.

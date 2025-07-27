@@ -2,10 +2,12 @@ package server
 
 import (
 	"flag"
+	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/google/uuid"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +22,7 @@ type Config struct {
 	Dir        string
 	DbFilename string
 	Port       string
+	MasterInfo string
 }
 type Replica struct {
 	Id   string
@@ -48,12 +51,25 @@ func NewServer(config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	parts := strings.Split(config.MasterInfo, " ")
+	if len(parts) != 2 {
+		fmt.Println("Invalid replica address. Expected 'host port'")
+	}
+	host := parts[0]
+	port := parts[1]
+	address := net.JoinHostPort(host, port)
+	_, err = net.ResolveTCPAddr("tcp", address)
+	role := Master
+	if err == nil {
+		role = Slave
+	}
+
 	serv := Server{
 		Id:               uuid.New().String(),
 		Db:               db,
 		Configuration:    config,
 		Listener:         l,
-		Role:             Master,
+		Role:             role,
 		ConnectedReplica: nil,
 	}
 
@@ -64,11 +80,13 @@ func NewConfiguration() Config {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
 	port := flag.String("port", "6379", "Port")
+	replica := flag.String("replicaof", "0.0.0.0 0", "Is Replica")
 	flag.Parse()
 	return Config{
 		Dir:        *dir,
 		DbFilename: *dbfilename,
 		Port:       *port,
+		MasterInfo: *replica,
 	}
 }
 

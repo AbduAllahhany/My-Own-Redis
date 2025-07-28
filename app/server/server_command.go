@@ -1,28 +1,27 @@
-package command
+package server
 
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"path/filepath"
 	"strings"
 )
 
 // Server commands
-func Echo(serv *server.Server, args []string) []byte {
+func Echo(serv *Server, args []string) []byte {
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	return resp.BulkStringDecoder(args[0])
 }
-func Ping(serv *server.Server, args []string) []byte {
+func Ping(serv *Server, args []string) []byte {
 	if len(args) != 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	return resp.SimpleStringDecoder("PONG")
 }
 
-// Config
-func Config(serv *server.Server, args []string) []byte {
+// Configuration
+func Config(serv *Server, args []string) []byte {
 	if len(args) == 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -32,13 +31,13 @@ func Config(serv *server.Server, args []string) []byte {
 
 	return []byte(resp.Nil)
 }
-func configGet(serv *server.Server, args []string) []byte {
+func configGet(serv *Server, args []string) []byte {
 	if len(args) == 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	var arr []string
 	for _, arg := range args {
-		val, ok := server.ConfigLookup[arg]
+		val, ok := ConfigLookup[arg]
 		if ok {
 			arr = append(arr, arg)
 			arr = append(arr, val)
@@ -48,7 +47,7 @@ func configGet(serv *server.Server, args []string) []byte {
 }
 
 // Blocking function
-func Keys(serv *server.Server, args []string) []byte {
+func Keys(serv *Server, args []string) []byte {
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -70,19 +69,19 @@ func Keys(serv *server.Server, args []string) []byte {
 	}
 	return resp.ArrayDecoder(matches)
 }
-func Info(serv *server.Server, args []string) []byte {
+func Info(serv *Server, args []string) []byte {
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	if strings.ToUpper(args[0]) == "REPLICATION" {
 
 		out := "#REPLICATION" + resp.CLRF
-		if serv.Role == server.Master {
+		if serv.Role == Master {
 			out += "role:master" + resp.CLRF
 			out += "master_replid:" + serv.Id + resp.CLRF
 			out += "master_repl_offset:0" + resp.CLRF
 			return resp.BulkStringDecoder(out)
-		} else if serv.Role == server.Slave {
+		} else if serv.Role == Slave {
 			out += "role:slave" + resp.CLRF
 			return resp.BulkStringDecoder(out)
 		}

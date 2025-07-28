@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/command"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"io"
 	"net"
@@ -43,7 +42,7 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
 	for {
-		cmd, err := command.Read(reader)
+		cmd, err := server.Read(reader)
 		if err == io.EOF {
 			return
 		}

@@ -1,9 +1,8 @@
-package command
+package server
 
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +31,7 @@ func IndexOf(slice []string, item string) int {
 // [NX | XX]
 // [GET]
 // [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-func Set(serv *server.Server, args []string) []byte {
+func Set(serv *Server, args []string) []byte {
 	store := serv.Db
 	if len(args) < 2 || len(args) > 5 {
 		return resp.ErrorDecoder("ERR syntax error")
@@ -77,7 +76,7 @@ func Set(serv *server.Server, args []string) []byte {
 	}
 	return resp.SimpleStringDecoder("OK")
 }
-func Get(serv *server.Server, args []string) []byte {
+func Get(serv *Server, args []string) []byte {
 	store := serv.Db
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")

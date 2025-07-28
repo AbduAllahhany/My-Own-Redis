@@ -1,11 +1,10 @@
-package command
+package server
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"strconv"
 	"strings"
 )
@@ -19,7 +18,7 @@ var (
 
 const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
-type HandlerCmd func(serv *server.Server, args []string) []byte
+type HandlerCmd func(serv *Server, args []string) []byte
 
 // Register command
 var lookUpCommands = map[string]HandlerCmd{
@@ -35,7 +34,7 @@ var lookUpCommands = map[string]HandlerCmd{
 type Command struct {
 	Name   string
 	Args   []string
-	handle HandlerCmd
+	Handle HandlerCmd
 }
 
 func Read(reader *bufio.Reader) (Command, error) {
@@ -81,8 +80,8 @@ func Read(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (cmd Command) Process(serv *server.Server) []byte {
-	handler := cmd.handle
+func (cmd Command) Process(serv *Server) []byte {
+	handler := cmd.Handle
 	if handler == nil {
 		return []byte(resp.Nil)
 	}
@@ -98,7 +97,7 @@ func parseCommand(parts []string) (Command, error) {
 	}
 	cmd := Command{
 		Name:   parts[0],
-		handle: lookUpCommands[strings.ToUpper(parts[0])],
+		Handle: lookUpCommands[strings.ToUpper(parts[0])],
 	}
 	if len(parts) > 1 {
 		cmd.Args = parts[1:]

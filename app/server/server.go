@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"math/big"
 	"net"
 	"strings"
@@ -19,7 +20,7 @@ const (
 	Slave  = "SLAVE"
 )
 
-type Config struct {
+type Configuration struct {
 	Dir        string
 	DbFilename string
 	Port       string
@@ -27,20 +28,20 @@ type Config struct {
 }
 type Node struct {
 	Id   string
-	Port int
-	Ip   net.IP
+	Port string
+	Ip   string
 }
 type Server struct {
 	Id               string
 	Db               engine.DbStore
-	Configuration    Config
+	Configuration    Configuration
 	Listener         net.Listener
 	Role             string
 	ConnectedReplica []Node
 	ConnectedMaster  []Node
 }
 
-func NewServer(config Config) (*Server, error) {
+func NewServer(config Configuration) (*Server, error) {
 	//create data store instance
 	path := config.Dir + "/" + config.DbFilename
 	dict := rdb.Encode(path)
@@ -57,9 +58,9 @@ func NewServer(config Config) (*Server, error) {
 	if len(parts) != 2 {
 		fmt.Println("Invalid replica address. Expected 'host port'")
 	}
-	host := parts[0]
-	port := parts[1]
-	address := net.JoinHostPort(host, port)
+	masterIp := parts[0]
+	masterPort := parts[1]
+	address := net.JoinHostPort(masterIp, masterPort)
 	_, err = net.ResolveTCPAddr("tcp", address)
 	role := Master
 	if err == nil {
@@ -73,18 +74,27 @@ func NewServer(config Config) (*Server, error) {
 		Listener:         l,
 		Role:             role,
 		ConnectedReplica: nil,
+		ConnectedMaster:  nil,
 	}
-
+	if role == Slave {
+		serv.ConnectedMaster = []Node{
+			{
+				Port: masterPort,
+				Ip:   masterIp,
+			},
+		}
+		slaveInit(&serv)
+	}
 	return &serv, nil
 }
 
-func NewConfiguration() Config {
+func NewConfiguration() Configuration {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
 	port := flag.String("port", "6379", "Port")
 	replica := flag.String("replicaof", "Bad Address", "Is Replica")
 	flag.Parse()
-	return Config{
+	return Configuration{
 		Dir:        *dir,
 		DbFilename: *dbfilename,
 		Port:       *port,
@@ -92,7 +102,7 @@ func NewConfiguration() Config {
 	}
 }
 
-func configToMap(config Config) map[string]string {
+func configToMap(config Configuration) map[string]string {
 	return map[string]string{
 		"dir":        config.Dir,
 		"dbfilename": config.DbFilename,
@@ -111,4 +121,27 @@ func generateID() string {
 		result[i] = charset[num.Int64()]
 	}
 	return string(result)
+}
+func slaveInit(serv *Server) error {
+	cmd := Command{
+		Name:   "PING",
+		Args:   nil,
+		Handle: Ping,
+	}
+	for _, node := range serv.ConnectedMaster {
+		conn, err := net.Dial("tcp", node.Ip+":"+node.Port)
+		defer conn.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+		out := []string{cmd.Name}
+		out = append(out, cmd.Args...)
+		result := resp.ArrayDecoder(out)
+		conn.Write(result)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
 }

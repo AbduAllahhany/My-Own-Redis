@@ -154,6 +154,15 @@ func slaveInit(serv *Server) error {
 		Args:   repliconfCapArgs,
 		Handle: Replconfg,
 	}
+	psyncCmdArgs := []string{
+		"?",
+		"-1",
+	}
+	psyncCmd := Command{
+		Name:   "PSYNC",
+		Args:   psyncCmdArgs,
+		Handle: nil,
+	}
 	buf := make([]byte, 1024)
 	for _, node := range serv.ConnectedMaster {
 
@@ -184,6 +193,16 @@ func slaveInit(serv *Server) error {
 			return err
 		}
 		err = WriteCommand(writer, &repliconfCapCmd)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		_, err = conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		err = WriteCommand(writer, &psyncCmd)
 		if err != nil {
 			fmt.Println(err)
 			return err

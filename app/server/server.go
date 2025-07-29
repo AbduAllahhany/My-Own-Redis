@@ -42,6 +42,7 @@ type Server struct {
 	Configuration    Configuration
 	Listener         net.Listener
 	Role             string
+	offset           int
 	ConnectedReplica []Node
 	ConnectedMaster  []Node
 }
@@ -172,6 +173,7 @@ func slaveInit(serv *Server) error {
 		}
 		defer conn.Close()
 		writer := bufio.NewWriter(conn)
+
 		err = WriteCommand(writer, &pingCmd)
 		if err != nil {
 			fmt.Println(err)
@@ -182,6 +184,7 @@ func slaveInit(serv *Server) error {
 			fmt.Println(err)
 			return err
 		}
+
 		err = WriteCommand(writer, &repliconfPortCmd)
 		if err != nil {
 			fmt.Println(err)
@@ -192,6 +195,7 @@ func slaveInit(serv *Server) error {
 			fmt.Println(err)
 			return err
 		}
+
 		err = WriteCommand(writer, &repliconfCapCmd)
 		if err != nil {
 			fmt.Println(err)
@@ -202,6 +206,7 @@ func slaveInit(serv *Server) error {
 			fmt.Println(err)
 			return err
 		}
+
 		err = WriteCommand(writer, &psyncCmd)
 		if err != nil {
 			fmt.Println(err)

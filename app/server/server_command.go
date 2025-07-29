@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -90,13 +91,9 @@ func Info(serv *Server, args []string) []byte {
 }
 
 func Replconfg(serv *Server, args []string) []byte {
-	if serv.ConnectedReplica == nil {
-		serv.ConnectedReplica = []Node{
-			{
-				Port: "",
-				Ip:   "",
-			},
-		}
-	}
 	return resp.SimpleStringDecoder("OK")
+}
+func Psync(serv *Server, args []string) []byte {
+	out := "FULLRESYNC" + serv.Id + strconv.Itoa(serv.offset)
+	return resp.SimpleStringDecoder(out)
 }

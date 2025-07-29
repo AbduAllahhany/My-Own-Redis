@@ -22,14 +22,15 @@ type HandlerCmd func(serv *Server, args []string) []byte
 
 // Register command
 var lookUpCommands = map[string]HandlerCmd{
-	"SET":    Set,
-	"GET":    Get,
-	"ECHO":   Echo,
-	"PING":   Ping,
-	"CONFIG": Config,
-	"KEYS":   Keys,
-	"INFO":   Info,
-}
+	"SET":       Set,
+	"GET":       Get,
+	"ECHO":      Echo,
+	"PING":      Ping,
+	"CONFIG":    Config,
+	"KEYS":      Keys,
+	"INFO":      Info,
+	"PSYNC":     Psync,
+	"REPLCONFG": Replconfg}
 
 type Command struct {
 	Name   string

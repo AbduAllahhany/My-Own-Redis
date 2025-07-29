@@ -135,15 +135,18 @@ func slaveInit(serv *Server) error {
 		Args:   nil,
 		Handle: Ping,
 	}
-	repliconfPortArgs := []string{
-		"listening-port",
-		serv.Configuration.Port,
-	}
-	repliconfPortCmd := Command{
-		Name:   "REPLCONF",
-		Args:   repliconfPortArgs,
-		Handle: Replconfg,
-	}
+	/*
+		repliconfPortArgs := []string{
+			"listening-port",
+			serv.Configuration.Port,
+		}
+		repliconfPortCmd := Command{
+			Name:   "REPLCONF",
+			Args:   repliconfPortArgs,
+			Handle: Replconfg,
+		}
+
+	*/
 
 	/*repliconfCapArgs := []string{
 		"capa",
@@ -167,7 +170,7 @@ func slaveInit(serv *Server) error {
 		if err != nil {
 			fmt.Println(err)
 		}
-		err = WriteCommand(writer, &repliconfPortCmd)
+		//	err = WriteCommand(writer, &repliconfPortCmd)
 		if err != nil {
 			fmt.Println(err)
 		}

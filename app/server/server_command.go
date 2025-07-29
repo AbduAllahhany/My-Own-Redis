@@ -94,6 +94,6 @@ func Replconfg(serv *Server, args []string) []byte {
 	return resp.SimpleStringDecoder("OK")
 }
 func Psync(serv *Server, args []string) []byte {
-	out := "FULLRESYNC" + serv.Id + strconv.Itoa(serv.offset)
+	out := "FULLRESYNC" + " " + serv.Id + " " + strconv.Itoa(serv.offset)
 	return resp.SimpleStringDecoder(out)
 }

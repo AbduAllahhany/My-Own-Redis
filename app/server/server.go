@@ -149,11 +149,12 @@ func slaveInit(serv *Server) error {
 		"capa",
 		"psync2",
 	}
-	repliconfCapCmd := Command{
+	/*repliconfCapCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfCapArgs,
 		Handle: Replconfg,
 	}
+	*/
 	for _, node := range serv.ConnectedMaster {
 
 		conn, err := net.Dial("tcp", node.Ip+":"+node.Port)

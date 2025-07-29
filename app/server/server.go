@@ -145,11 +145,11 @@ func slaveInit(serv *Server) error {
 		Handle: Replconfg,
 	}
 
-	repliconfCapArgs := []string{
+	/*repliconfCapArgs := []string{
 		"capa",
 		"psync2",
 	}
-	/*repliconfCapCmd := Command{
+	repliconfCapCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfCapArgs,
 		Handle: Replconfg,

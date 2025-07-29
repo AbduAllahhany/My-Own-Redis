@@ -135,20 +135,17 @@ func slaveInit(serv *Server) error {
 		Args:   nil,
 		Handle: Ping,
 	}
-	/*
-		repliconfPortArgs := []string{
-			"listening-port",
-			serv.Configuration.Port,
-		}
-		repliconfPortCmd := Command{
-			Name:   "REPLCONF",
-			Args:   repliconfPortArgs,
-			Handle: Replconfg,
-		}
+	repliconfPortArgs := []string{
+		"listening-port",
+		serv.Configuration.Port,
+	}
+	repliconfPortCmd := Command{
+		Name:   "REPLCONF",
+		Args:   repliconfPortArgs,
+		Handle: Replconfg,
+	}
 
-	*/
-
-	/*repliconfCapArgs := []string{
+	repliconfCapArgs := []string{
 		"capa",
 		"psync2",
 	}
@@ -157,7 +154,7 @@ func slaveInit(serv *Server) error {
 		Args:   repliconfCapArgs,
 		Handle: Replconfg,
 	}
-	*/
+	buf := make([]byte, 1024)
 	for _, node := range serv.ConnectedMaster {
 
 		conn, err := net.Dial("tcp", node.Ip+":"+node.Port)
@@ -169,14 +166,32 @@ func slaveInit(serv *Server) error {
 		err = WriteCommand(writer, &pingCmd)
 		if err != nil {
 			fmt.Println(err)
+			return err
 		}
-		//	err = WriteCommand(writer, &repliconfPortCmd)
+		_, err = conn.Read(buf)
 		if err != nil {
 			fmt.Println(err)
+			return err
 		}
-		//err = WriteCommand(writer, &repliconfCapCmd)
+		err = WriteCommand(writer, &repliconfPortCmd)
 		if err != nil {
 			fmt.Println(err)
+			return err
+		}
+		_, err = conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		err = WriteCommand(writer, &repliconfCapCmd)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		_, err = conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return err
 		}
 	}
 	return nil

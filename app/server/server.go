@@ -161,9 +161,6 @@ func slaveInit(serv *Server) error {
 			return err
 		}
 		defer conn.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
 		writer := bufio.NewWriter(conn)
 		err = WriteCommand(writer, &pingCmd)
 		if err != nil {
@@ -173,7 +170,7 @@ func slaveInit(serv *Server) error {
 		if err != nil {
 			fmt.Println(err)
 		}
-		err = WriteCommand(writer, &repliconfCapCmd)
+		//err = WriteCommand(writer, &repliconfCapCmd)
 		if err != nil {
 			fmt.Println(err)
 		}

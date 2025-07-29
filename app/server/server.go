@@ -25,6 +25,12 @@ const (
 	Slave  = "SLAVE"
 )
 
+type Request struct {
+	Serv *Server
+	Args []string
+	//metadata
+	Conn *net.Conn
+}
 type Configuration struct {
 	Dir        string
 	DbFilename string
@@ -90,7 +96,7 @@ func NewServer(config Configuration) (*Server, error) {
 				Ip:   masterIp,
 			},
 		}
-		slaveInit(&serv)
+		NewSlave(&serv)
 	}
 	return &serv, nil
 }
@@ -130,7 +136,8 @@ func generateID() string {
 	return string(result)
 }
 
-func slaveInit(serv *Server) error {
+// kanye west reference
+func NewSlave(serv *Server) error {
 	pingCmd := Command{
 		Name:   "PING",
 		Args:   nil,

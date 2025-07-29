@@ -8,13 +8,15 @@ import (
 )
 
 // Server commands
-func Echo(serv *Server, args []string) []byte {
+func Echo(request *Request) []byte {
+	args := request.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	return resp.BulkStringDecoder(args[0])
 }
-func Ping(serv *Server, args []string) []byte {
+func Ping(request *Request) []byte {
+	args := request.Args
 	if len(args) != 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -22,17 +24,25 @@ func Ping(serv *Server, args []string) []byte {
 }
 
 // Configuration
-func Config(serv *Server, args []string) []byte {
+func Config(request *Request) []byte {
+	args := request.Args
 	if len(args) == 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	if strings.ToUpper(args[0]) == "GET" {
-		return configGet(serv, args[1:])
+		req := Request{
+			Serv: request.Serv,
+			Args: args[1:],
+			Conn: request.Conn,
+		}
+		return configGet(&req)
 	}
 
 	return []byte(resp.Nil)
 }
-func configGet(serv *Server, args []string) []byte {
+func configGet(request *Request) []byte {
+	args := request.Args
+
 	if len(args) == 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -48,11 +58,12 @@ func configGet(serv *Server, args []string) []byte {
 }
 
 // Blocking function
-func Keys(serv *Server, args []string) []byte {
+func Keys(request *Request) []byte {
+	args := request.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
-	store := serv.Db
+	store := request.Serv.Db
 	dict := store.Dict
 	mu := store.Mu
 	mu.Lock()
@@ -70,19 +81,20 @@ func Keys(serv *Server, args []string) []byte {
 	}
 	return resp.ArrayDecoder(matches)
 }
-func Info(serv *Server, args []string) []byte {
+func Info(request *Request) []byte {
+	args := request.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	if strings.ToUpper(args[0]) == "REPLICATION" {
 
 		out := "#REPLICATION" + resp.CLRF
-		if serv.Role == Master {
+		if request.Serv.Role == Master {
 			out += "role:master" + resp.CLRF
-			out += "master_replid:" + serv.Id + resp.CLRF
+			out += "master_replid:" + request.Serv.Id + resp.CLRF
 			out += "master_repl_offset:0" + resp.CLRF
 			return resp.BulkStringDecoder(out)
-		} else if serv.Role == Slave {
+		} else if request.Serv.Role == Slave {
 			out += "role:slave" + resp.CLRF
 			return resp.BulkStringDecoder(out)
 		}
@@ -90,10 +102,25 @@ func Info(serv *Server, args []string) []byte {
 	return resp.ErrorDecoder("ERR syntax error")
 }
 
-func Replconfg(serv *Server, args []string) []byte {
+func Replconfg(request *Request) []byte {
 	return resp.SimpleStringDecoder("OK")
 }
-func Psync(serv *Server, args []string) []byte {
-	out := "FULLRESYNC" + " " + serv.Id + " " + strconv.Itoa(serv.offset)
+func Psync(request *Request) []byte {
+	conn := *request.Conn
+	addrss := conn.RemoteAddr().String()
+	host := strings.Split(addrss, ":")
+	replica := Node{
+		Id:   generateID(),
+		Port: host[1],
+		Ip:   host[0],
+	}
+	if request.Serv.ConnectedReplica == nil {
+		request.Serv.ConnectedReplica = []Node{
+			replica,
+		}
+	} else {
+		request.Serv.ConnectedReplica = append(request.Serv.ConnectedReplica, replica)
+	}
+	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
 	return resp.SimpleStringDecoder(out)
 }

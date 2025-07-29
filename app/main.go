@@ -38,6 +38,7 @@ func main() {
 }
 func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
+	conn.
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
@@ -49,7 +50,7 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		out := serv.ProcessCommand(&cmd)
+		out := serv.ProcessCommand(&conn, &cmd)
 		conn.Write(out)
 		fmt.Println(cmd)
 	}

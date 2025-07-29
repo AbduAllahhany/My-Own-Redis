@@ -31,8 +31,9 @@ func IndexOf(slice []string, item string) int {
 // [NX | XX]
 // [GET]
 // [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-func Set(serv *Server, args []string) []byte {
-	store := serv.Db
+func Set(request *Request) []byte {
+	store := request.Serv.Db
+	args := request.Args
 	if len(args) < 2 || len(args) > 5 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -70,14 +71,20 @@ func Set(serv *Server, args []string) []byte {
 	mu.Unlock()
 
 	if Contains(args, "GET") {
-		return Get(serv, []string{
-			args[0],
-		})
+		req := Request{
+			Serv: request.Serv,
+			Args: []string{
+				args[0],
+			},
+			Conn: request.Conn,
+		}
+		return Get(&req)
 	}
 	return resp.SimpleStringDecoder("OK")
 }
-func Get(serv *Server, args []string) []byte {
-	store := serv.Db
+func Get(request *Request) []byte {
+	store := request.Serv.Db
+	args := request.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}

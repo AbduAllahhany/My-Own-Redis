@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -18,7 +19,7 @@ var (
 
 const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
-type HandlerCmd func(serv *Server, args []string) []byte
+type HandlerCmd func(request *Request) []byte
 
 // Register command
 var lookUpCommands = map[string]HandlerCmd{
@@ -81,12 +82,17 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (serv Server) ProcessCommand(cmd *Command) []byte {
+func (serv Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 	handler := cmd.Handle
 	if handler == nil {
 		return []byte(resp.Nil)
 	}
-	out := handler(&serv, cmd.Args)
+	req := Request{
+		Serv: &serv,
+		Args: cmd.Args,
+		Conn: conn,
+	}
+	out := handler(&req)
 	return out
 }
 

@@ -88,3 +88,15 @@ func Info(serv *Server, args []string) []byte {
 	}
 	return resp.ErrorDecoder("ERR syntax error")
 }
+
+func Replconfg(serv *Server, args []string) []byte {
+	if serv.ConnectedReplica == nil {
+		serv.ConnectedReplica = []Node{
+			{
+				Port: "",
+				Ip:   "",
+			},
+		}
+	}
+	return resp.SimpleStringDecoder("OK")
+}

@@ -1,17 +1,22 @@
 package server
 
 import (
+	"bufio"
 	"crypto/rand"
 	"flag"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"math/big"
 	"net"
 	"strings"
 	"sync"
 )
+
+//todo
+//refactor this shittttttttttttttttttttttttttttttttttttttttttttttt
+//implement proper master ,slave ???
+//command ?????????????????????
 
 var ConfigLookup map[string]string
 
@@ -41,6 +46,7 @@ type Server struct {
 	ConnectedMaster  []Node
 }
 
+// type shitt
 func NewServer(config Configuration) (*Server, error) {
 	//create data store instance
 	path := config.Dir + "/" + config.DbFilename
@@ -102,13 +108,13 @@ func NewConfiguration() Configuration {
 	}
 }
 
+// helper
 func configToMap(config Configuration) map[string]string {
 	return map[string]string{
 		"dir":        config.Dir,
 		"dbfilename": config.DbFilename,
 	}
 }
-
 func generateID() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	const length = 40
@@ -122,26 +128,55 @@ func generateID() string {
 	}
 	return string(result)
 }
+
 func slaveInit(serv *Server) error {
-	cmd := Command{
+	pingCmd := Command{
 		Name:   "PING",
 		Args:   nil,
 		Handle: Ping,
 	}
+	repliconfPortArgs := []string{
+		"listening-port",
+		serv.Configuration.Port,
+	}
+	repliconfPortCmd := Command{
+		Name:   "REPLCONF",
+		Args:   repliconfPortArgs,
+		Handle: Replconfg,
+	}
+
+	repliconfCapArgs := []string{
+		"capa",
+		"psync2",
+	}
+	repliconfCapCmd := Command{
+		Name:   "REPLCONF",
+		Args:   repliconfCapArgs,
+		Handle: Replconfg,
+	}
 	for _, node := range serv.ConnectedMaster {
+
 		conn, err := net.Dial("tcp", node.Ip+":"+node.Port)
+		if err != nil {
+			return err
+		}
 		defer conn.Close()
 		if err != nil {
 			fmt.Println(err)
 		}
-		out := []string{cmd.Name}
-		out = append(out, cmd.Args...)
-		result := resp.ArrayDecoder(out)
-		conn.Write(result)
+		writer := bufio.NewWriter(conn)
+		err = WriteCommand(writer, &pingCmd)
 		if err != nil {
-			return err
+			fmt.Println(err)
+		}
+		err = WriteCommand(writer, &repliconfPortCmd)
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = WriteCommand(writer, &repliconfCapCmd)
+		if err != nil {
+			fmt.Println(err)
 		}
 	}
 	return nil
-
 }

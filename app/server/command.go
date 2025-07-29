@@ -37,7 +37,7 @@ type Command struct {
 	Handle HandlerCmd
 }
 
-func Read(reader *bufio.Reader) (Command, error) {
+func ReadCommand(reader *bufio.Reader) (Command, error) {
 	//first line
 	line, err := reader.ReadString('\n')
 	if err != nil {
@@ -80,17 +80,16 @@ func Read(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (cmd Command) Process(serv *Server) []byte {
+func (serv Server) ProcessCommand(cmd *Command) []byte {
 	handler := cmd.Handle
 	if handler == nil {
 		return []byte(resp.Nil)
 	}
-	out := handler(serv, cmd.Args)
+	out := handler(&serv, cmd.Args)
 	return out
 }
 
-//helper function
-
+// helper function
 func parseCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
 		return Command{}, ErrEmptyCommand
@@ -158,4 +157,13 @@ func readNumbersFromLine(line string) (int, error) {
 		return -1, err
 	}
 	return n, nil
+}
+
+func WriteCommand(writer *bufio.Writer, cmd *Command) error {
+	out := []string{cmd.Name}
+	out = append(out, cmd.Args...)
+	result := resp.ArrayDecoder(out)
+	_, err := writer.Write(result)
+	err = writer.Flush()
+	return err
 }

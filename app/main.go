@@ -42,14 +42,14 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
 	for {
-		cmd, err := server.Read(reader)
+		cmd, err := server.ReadCommand(reader)
 		if err == io.EOF {
 			return
 		}
 		if err != nil {
 			fmt.Println(err)
 		}
-		out := cmd.Process(serv)
+		out := serv.ProcessCommand(&cmd)
 		conn.Write(out)
 		fmt.Println(cmd)
 	}

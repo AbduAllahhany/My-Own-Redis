@@ -49,9 +49,11 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 	}
 
 	auxMap := map[string]string{
-		"redis-ver":    "1.0.0",
-		"redis-bits":   "64",
-		"aof-preamble": "0",
+		"redis-ver":  "7.2.0",
+		"redis-bits": "64",
+		"ctime":      fmt.Sprintf("%d", time.Now().Unix()),
+		"used-mem":   "69808",
+		"aof-base":   "0",
 	}
 	for k, v := range auxMap {
 		if err := enc.WriteAux(k, v); err != nil {
@@ -59,39 +61,42 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 		}
 	}
 
-	// Calculate the number of keys and expiring keys in dict for the DB header
-	dictSize := len(dict)
-	expiringKeys := 0
-	for _, redisObj := range dict {
-		if redisObj.HasExpiration() {
-			expiringKeys++
-		}
-	}
-
-	if err := enc.WriteDBHeader(0, uint64(dictSize), uint64(expiringKeys)); err != nil {
-		return nil, fmt.Errorf("failed to write DB header: %w", err)
-	}
-
-	for key, redisObj := range dict {
-		var err error
-
-		switch redisObj.Type() {
-		case "STRING":
+	if len(dict) > 0 {
+		dictSize := len(dict)
+		expiringKeys := 0
+		for _, redisObj := range dict {
 			if redisObj.HasExpiration() {
-				expirationMs := uint64(redisObj.GetExpiration().Unix() * 1000)
-				err = enc.WriteStringObject(key, []byte(redisObj.Value().(string)), encoder.WithTTL(expirationMs))
-			} else {
-				err = enc.WriteStringObject(key, []byte(redisObj.Value().(string)))
+				expiringKeys++
 			}
-		default:
-			continue
 		}
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to write object %s (type: %s): %w", key, redisObj.Type(), err)
+		if err := enc.WriteDBHeader(0, uint64(dictSize), uint64(expiringKeys)); err != nil {
+			return nil, fmt.Errorf("failed to write DB header: %w", err)
+		}
+
+		for key, redisObj := range dict {
+			var err error
+
+			switch redisObj.Type() {
+			case "STRING":
+				if redisObj.HasExpiration() {
+					expirationMs := uint64(redisObj.GetExpiration().Unix() * 1000)
+					err = enc.WriteStringObject(key, []byte(redisObj.Value().(string)), encoder.WithTTL(expirationMs))
+				} else {
+					err = enc.WriteStringObject(key, []byte(redisObj.Value().(string)))
+				}
+			default:
+				continue
+			}
+			if err := enc.WriteEnd(); err != nil {
+				return nil, fmt.Errorf("failed to write RDB end marker: %w", err)
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to write object %s (type: %s): %w", key, redisObj.Type(), err)
+			}
 		}
 	}
-
 	return buf.Bytes(), nil
 }
 

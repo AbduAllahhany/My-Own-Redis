@@ -125,7 +125,8 @@ func Psync(request *Request) []byte {
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
 	conn.Write(resp.SimpleStringDecoder(out))
 	res := resp.BulkStringDecoder(string(bgserverReplication(request)))
-	return res[:len(res)-2]
+	res = res[:len(res)-2]
+	return res
 }
 func bgserverReplication(request *Request) []byte {
 	res, err := rdb.GenerateRDBBinary(request.Serv.Db.Dict)

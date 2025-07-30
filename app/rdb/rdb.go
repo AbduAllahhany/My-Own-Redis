@@ -92,9 +92,6 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 		}
 	}
 
-	if err := enc.WriteEnd(); err != nil {
-		return nil, fmt.Errorf("failed to write RDB end marker: %w", err)
-	}
 	return buf.Bytes(), nil
 }
 

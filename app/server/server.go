@@ -38,9 +38,9 @@ type Configuration struct {
 	MasterInfo string
 }
 type Node struct {
-	Id   string
-	Port string
-	Ip   string
+	Id         string
+	LocalAddr  *net.TCPAddr
+	RemoteAddr *net.TCPAddr
 }
 type Server struct {
 	Id               string
@@ -74,7 +74,8 @@ func NewServer(config Configuration) (*Server, error) {
 	masterIp := parts[0]
 	masterPort := parts[1]
 	address := net.JoinHostPort(masterIp, masterPort)
-	_, err = net.ResolveTCPAddr("tcp", address)
+	tcpAddress, err := net.ResolveTCPAddr("tcp", address)
+
 	role := Master
 	if err == nil {
 		role = Slave
@@ -92,8 +93,8 @@ func NewServer(config Configuration) (*Server, error) {
 	if role == Slave {
 		serv.ConnectedMaster = []Node{
 			{
-				Port: masterPort,
-				Ip:   masterIp,
+				LocalAddr:  tcpAddress,
+				RemoteAddr: tcpAddress,
 			},
 		}
 		NewSlave(&serv)
@@ -173,8 +174,7 @@ func NewSlave(serv *Server) error {
 	}
 	buf := make([]byte, 1024)
 	for _, node := range serv.ConnectedMaster {
-
-		conn, err := net.Dial("tcp", node.Ip+":"+node.Port)
+		conn, err := net.Dial("tcp", node.LocalAddr.String())
 		if err != nil {
 			return err
 		}

@@ -100,7 +100,7 @@ func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 	out := handler(&req)
 	if cmd.IsWritable {
 		for _, replica := range serv.ConnectedReplica {
-			replicaConn, err := net.Dial("tcp", replica.Ip+":"+replica.Port)
+			replicaConn, err := net.DialTCP("tcp", replica.LocalAddr, replica.RemoteAddr)
 			if err != nil {
 				continue
 			}

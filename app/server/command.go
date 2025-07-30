@@ -33,11 +33,15 @@ var lookUpCommands = map[string]HandlerCmd{
 	"PSYNC":    Psync,
 	"REPLCONF": Replconfg,
 }
+var writeCommand = map[string]bool{
+	"SET": true,
+}
 
 type Command struct {
-	Name   string
-	Args   []string
-	Handle HandlerCmd
+	Name       string
+	Args       []string
+	IsWritable bool
+	Handle     HandlerCmd
 }
 
 func ReadCommand(reader *bufio.Reader) (Command, error) {
@@ -94,6 +98,17 @@ func (serv Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 		Conn: conn,
 	}
 	out := handler(&req)
+	if cmd.IsWritable {
+		for _, replica := range serv.ConnectedReplica {
+			replicaConn, err := net.Dial("tcp", replica.Ip+":"+replica.Port)
+			if err != nil {
+				continue
+			}
+			defer replicaConn.Close()
+			writer := bufio.NewWriter(replicaConn)
+			WriteCommand(writer, cmd)
+		}
+	}
 	return out
 }
 
@@ -102,9 +117,11 @@ func parseCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
 		return Command{}, ErrEmptyCommand
 	}
+	cmdName := strings.ToUpper(parts[0])
 	cmd := Command{
-		Name:   parts[0],
-		Handle: lookUpCommands[strings.ToUpper(parts[0])],
+		Name:       cmdName,
+		Handle:     lookUpCommands[strings.ToUpper(parts[0])],
+		IsWritable: writeCommand[cmdName],
 	}
 	if len(parts) > 1 {
 		cmd.Args = parts[1:]

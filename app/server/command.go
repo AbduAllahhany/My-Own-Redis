@@ -31,7 +31,8 @@ var lookUpCommands = map[string]HandlerCmd{
 	"KEYS":     Keys,
 	"INFO":     Info,
 	"PSYNC":    Psync,
-	"REPLCONF": Replconfg}
+	"REPLCONF": Replconfg,
+}
 
 type Command struct {
 	Name   string

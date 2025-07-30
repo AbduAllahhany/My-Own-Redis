@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"path/filepath"
 	"strconv"
@@ -122,5 +123,13 @@ func Psync(request *Request) []byte {
 		request.Serv.ConnectedReplica = append(request.Serv.ConnectedReplica, replica)
 	}
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
-	return resp.SimpleStringDecoder(out)
+	conn.Write(resp.SimpleStringDecoder(out))
+	return bgserverReplication(request)
+}
+func bgserverReplication(request *Request) []byte {
+	res, err := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
+	if err != nil {
+		return resp.ErrorDecoder("ERR cannot create rdb file")
+	}
+	return res
 }

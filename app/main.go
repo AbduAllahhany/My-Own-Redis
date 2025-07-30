@@ -38,7 +38,6 @@ func main() {
 }
 func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
-	conn.
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)

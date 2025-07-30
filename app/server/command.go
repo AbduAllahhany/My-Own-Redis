@@ -87,13 +87,13 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (serv Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
+func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 	handler := cmd.Handle
 	if handler == nil {
 		return []byte(resp.Nil)
 	}
 	req := Request{
-		Serv: &serv,
+		Serv: serv,
 		Args: cmd.Args,
 		Conn: conn,
 	}

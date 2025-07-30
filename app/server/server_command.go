@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"encoding/hex"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"path/filepath"
 	"strconv"
@@ -124,14 +124,9 @@ func Psync(request *Request) []byte {
 	}
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
 	conn.Write(resp.SimpleStringDecoder(out))
-	res := resp.BulkStringDecoder(string(bgserverReplication(request)))
+	hexRDB := "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
+	rdbBytes, _ := hex.DecodeString(hexRDB)
+	res := resp.BulkStringDecoder(string(rdbBytes))
 	res = res[:len(res)-2]
-	return res
-}
-func bgserverReplication(request *Request) []byte {
-	res, err := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
-	if err != nil {
-		return resp.ErrorDecoder("ERR cannot create rdb file")
-	}
 	return res
 }

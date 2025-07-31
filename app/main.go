@@ -65,8 +65,8 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
+	reader := bufio.NewReader(conn)
 	for {
-		reader := bufio.NewReader(conn)
 		cmd, err := server.ReadCommand(reader)
 		if err == io.EOF {
 			return

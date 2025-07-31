@@ -121,8 +121,7 @@ func Psync(request *Request) []byte {
 	}
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
 	conn.Write(resp.SimpleStringDecoder(out))
-	// bgserverReplication(request)
-	res := resp.BulkStringDecoder("pk")
+	res := resp.BulkStringDecoder(string(bgserverReplication(request)))
 	return res[:len(res)-2]
 }
 func bgserverReplication(request *Request) []byte {

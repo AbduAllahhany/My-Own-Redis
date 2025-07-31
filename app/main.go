@@ -77,7 +77,8 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 		out := serv.ProcessCommand(&conn, &cmd)
 		conn.Write(out)
 		fmt.Println(cmd)
-		fmt.Println(out)
+		str := string(out)
+		fmt.Println(str)
 
 	}
 }

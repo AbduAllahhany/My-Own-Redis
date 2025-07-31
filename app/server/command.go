@@ -90,7 +90,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 	handler := cmd.Handle
 	if handler == nil {
-		return []byte(resp.Nil)
+		return resp.ErrorDecoder("ERR unknown command")
 	}
 	req := Request{
 		Serv: serv,
@@ -100,11 +100,7 @@ func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 	out := handler(&req)
 	if cmd.IsWritable {
 		for _, replica := range serv.ConnectedReplica {
-			replicaConn, err := net.DialTCP("tcp", replica.LocalAddr, replica.RemoteAddr)
-			if err != nil {
-				continue
-			}
-			defer replicaConn.Close()
+			replicaConn := *replica.Conn
 			writer := bufio.NewWriter(replicaConn)
 			WriteCommand(writer, cmd)
 		}

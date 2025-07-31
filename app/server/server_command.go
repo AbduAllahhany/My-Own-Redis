@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
-	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -110,9 +109,8 @@ func Replconfg(request *Request) []byte {
 func Psync(request *Request) []byte {
 	conn := *request.Conn
 	replica := Node{
-		Id:         generateID(),
-		RemoteAddr: conn.RemoteAddr().(*net.TCPAddr),
-		LocalAddr:  conn.LocalAddr().(*net.TCPAddr),
+		Id:   generateID(),
+		Conn: &conn,
 	}
 	if request.Serv.ConnectedReplica == nil {
 		request.Serv.ConnectedReplica = []Node{

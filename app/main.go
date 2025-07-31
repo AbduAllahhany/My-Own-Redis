@@ -27,6 +27,9 @@ func main() {
 	}
 	l := serv.Listener
 	defer l.Close()
+	if serv.Role == server.Slave {
+		go handleMasterConnection(serv)
+	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -36,6 +39,28 @@ func main() {
 		go handleConnection(conn, serv)
 	}
 }
+
+func handleMasterConnection(serv *server.Server) {
+	//buf := make([]byte, 1024)
+	for _, matser := range serv.ConnectedMaster {
+		conn := *matser.Conn
+		reader := bufio.NewReader(conn)
+		for {
+			cmd, err := server.ReadCommand(reader)
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				fmt.Println(err)
+			}
+			serv.ProcessCommand(&conn, &cmd)
+			fmt.Println(cmd)
+
+		}
+	}
+
+}
+
 func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
 	defer fmt.Println("connection closed")
@@ -52,5 +77,6 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 		out := serv.ProcessCommand(&conn, &cmd)
 		conn.Write(out)
 		fmt.Println(cmd)
+
 	}
 }

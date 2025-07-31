@@ -38,9 +38,8 @@ type Configuration struct {
 	MasterInfo string
 }
 type Node struct {
-	Id         string
-	LocalAddr  *net.TCPAddr
-	RemoteAddr *net.TCPAddr
+	Id   string
+	Conn *net.Conn
 }
 type Server struct {
 	Id               string
@@ -74,7 +73,7 @@ func NewServer(config Configuration) (*Server, error) {
 	masterIp := parts[0]
 	masterPort := parts[1]
 	address := net.JoinHostPort(masterIp, masterPort)
-	tcpAddress, err := net.ResolveTCPAddr("tcp", address)
+	masterConn, err := net.Dial("tcp", address)
 
 	role := Master
 	if err == nil {
@@ -93,8 +92,7 @@ func NewServer(config Configuration) (*Server, error) {
 	if role == Slave {
 		serv.ConnectedMaster = []Node{
 			{
-				LocalAddr:  tcpAddress,
-				RemoteAddr: tcpAddress,
+				Conn: &masterConn,
 			},
 		}
 		NewSlave(&serv)
@@ -174,14 +172,9 @@ func NewSlave(serv *Server) error {
 	}
 	buf := make([]byte, 1024)
 	for _, node := range serv.ConnectedMaster {
-		conn, err := net.Dial("tcp", node.LocalAddr.String())
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
+		conn := *node.Conn
 		writer := bufio.NewWriter(conn)
-
-		err = WriteCommand(writer, &pingCmd)
+		err := WriteCommand(writer, &pingCmd)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -219,6 +212,12 @@ func NewSlave(serv *Server) error {
 			fmt.Println(err)
 			return err
 		}
+		_, err = conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+
 		_, err = conn.Read(buf)
 		if err != nil {
 			fmt.Println(err)

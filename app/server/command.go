@@ -78,7 +78,6 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	} else {
 		return Command{}, ErrInvalidFormat
 	}
-	fmt.Println(parts)
 	cmd, err := parseCommand(parts)
 
 	if err != nil {

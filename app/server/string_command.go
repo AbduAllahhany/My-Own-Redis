@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"strconv"
@@ -80,6 +81,8 @@ func Set(request *Request) []byte {
 		}
 		return Get(&req)
 	}
+	fmt.Println(store)
+
 	return resp.SimpleStringDecoder("OK")
 }
 func Get(request *Request) []byte {

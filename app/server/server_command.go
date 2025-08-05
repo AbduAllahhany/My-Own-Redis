@@ -1,11 +1,13 @@
 package server
 
 import (
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"bufio"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 // Server commands
@@ -122,6 +124,7 @@ func replconfgGetAck(request *Request) []byte {
 }
 func Psync(request *Request) []byte {
 	conn := *request.Conn
+	writer := bufio.NewWriter(conn)
 	replica := Node{
 		Id:   generateID(),
 		Conn: &conn,
@@ -134,9 +137,10 @@ func Psync(request *Request) []byte {
 		request.Serv.ConnectedReplica = append(request.Serv.ConnectedReplica, replica)
 	}
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
-	conn.Write(resp.SimpleStringDecoder(out))
+	writer.Write(resp.SimpleStringDecoder(out))
 	res := resp.BulkStringDecoder(string(bgserverReplication(request)))
-	return res[:len(res)-2]
+	writer.Write(res[:len(res)-2])
+	return []byte("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n")
 }
 func bgserverReplication(request *Request) []byte {
 	res, err := rdb.GenerateRDBBinary(request.Serv.Db.Dict)

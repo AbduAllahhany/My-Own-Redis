@@ -83,16 +83,5 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 		out := serv.ProcessCommand(&conn, &cmd)
 		writer.Write(out)
 		writer.Flush()
-		if cmd.Name == "PSYNC" {
-			comm := server.Command{
-				Name: "REPLCONF",
-				Args: []string{
-					"GETACK", "*",
-				},
-				IsWritable: false,
-				Handle:     nil,
-			}
-			server.WriteCommand(writer, &comm)
-		}
 	}
 }

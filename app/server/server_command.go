@@ -140,6 +140,7 @@ func Psync(request *Request) []byte {
 	writer.Write(resp.SimpleStringDecoder(out))
 	res := resp.BulkStringDecoder(string(bgserverReplication(request)))
 	writer.Write(res[:len(res)-2])
+	writer.Flush()
 	return []byte("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n")
 }
 func bgserverReplication(request *Request) []byte {

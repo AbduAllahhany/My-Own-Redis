@@ -72,6 +72,7 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	writer := bufio.NewWriter(conn) // Add buffered writer for better performance
 	for {
 		cmd, err := server.ReadCommand(reader)
+		fmt.Println(cmd)
 		if err == io.EOF {
 			return
 		}
@@ -93,6 +94,5 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 			}
 			server.WriteCommand(writer, &comm)
 		}
-		fmt.Println(cmd)
 	}
 }

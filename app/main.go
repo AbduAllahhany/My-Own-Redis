@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"io"
 	"net"
 	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 //Todo
@@ -68,8 +69,8 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	defer conn.Close()
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
-	writer := bufio.NewWriter(conn) // Add buffered writer for better performance
 	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn) // Add buffered writer for better performance
 	for {
 		cmd, err := server.ReadCommand(reader)
 		fmt.Println(cmd)

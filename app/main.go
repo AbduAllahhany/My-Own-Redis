@@ -53,7 +53,10 @@ func handleMasterConnection(serv *server.Server) {
 			if err != nil {
 				fmt.Println(err)
 			}
-			serv.ProcessCommand(&conn, &cmd)
+			out := serv.ProcessCommand(&conn, &cmd)
+			if cmd.Name == "REPLCONF" && cmd.Args[0] == "GETACK" {
+				conn.Write(out)
+			}
 			fmt.Println(cmd)
 
 		}
@@ -79,6 +82,17 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 		out := serv.ProcessCommand(&conn, &cmd)
 		writer.Write(out)
 		writer.Flush()
+		if cmd.Name == "PSYNC" {
+			comm := server.Command{
+				Name: "REPLCONF",
+				Args: []string{
+					"GETACK", "*",
+				},
+				IsWritable: false,
+				Handle:     nil,
+			}
+			server.WriteCommand(writer, &comm)
+		}
 		fmt.Println(cmd)
 	}
 }

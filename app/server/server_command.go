@@ -104,7 +104,21 @@ func Info(request *Request) []byte {
 }
 
 func Replconfg(request *Request) []byte {
+	if strings.ToUpper(request.Args[0]) == "GETACK" {
+		req := Request{
+			Serv: request.Serv,
+			Args: request.Args[1:],
+			Conn: request.Conn,
+		}
+		return replconfgGetAck(&req)
+	}
 	return resp.SimpleStringDecoder("OK")
+}
+func replconfgGetAck(request *Request) []byte {
+	out := []string{
+		"REPLCONF", "ACK", "0",
+	}
+	return resp.ArrayDecoder(out)
 }
 func Psync(request *Request) []byte {
 	conn := *request.Conn

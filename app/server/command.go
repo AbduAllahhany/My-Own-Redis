@@ -16,6 +16,7 @@ var (
 	ErrBulkStringTooLarge = errors.New("bulk string too large")
 	ErrInvalidLength      = errors.New("invalid length")
 	ErrEmptyCommand       = errors.New("empty command")
+	ErrInvalidCommand     = errors.New("invalid command")
 )
 
 const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
@@ -87,17 +88,20 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
+func (serv *Server) ProcessCommand(connection *net.Conn, cmd *Command) error {
 	handler := cmd.Handle
+	conn := *connection
 	if handler == nil {
-		return resp.ErrorDecoder("ERR unknown command")
+		conn.Write(resp.ErrorDecoder("ERR unknown command"))
+		return ErrInvalidFormat
 	}
 	req := Request{
 		Serv: serv,
 		Args: cmd.Args,
-		Conn: conn,
+		Conn: &conn,
 	}
 	out := handler(&req)
+	conn.Write(out)
 	if cmd.IsWritable {
 		for _, replica := range serv.ConnectedReplica {
 			replicaConn := *replica.Conn
@@ -105,7 +109,7 @@ func (serv *Server) ProcessCommand(conn *net.Conn, cmd *Command) []byte {
 			WriteCommand(writer, cmd)
 		}
 	}
-	return out
+	return nil
 }
 
 // helper function

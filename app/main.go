@@ -27,6 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 	l := serv.Listener
+	fmt.Println(serv.Role)
 	defer l.Close()
 	if serv.Role == server.Slave {
 		go handleMasterConnection(serv)
@@ -43,26 +44,24 @@ func main() {
 
 func handleMasterConnection(serv *server.Server) {
 	//buf := make([]byte, 1024)
-	for _, matser := range serv.ConnectedMaster {
-		conn := *matser.Conn
-		reader := bufio.NewReader(conn)
-		for {
-			cmd, err := server.ReadCommand(reader)
-			if err == io.EOF {
-				return
-			}
-			if err != nil {
-				fmt.Println(err)
-			}
-			out := serv.ProcessCommand(&conn, &cmd)
-			if cmd.Name == "REPLCONF" && cmd.Args[0] == "GETACK" {
-				conn.Write(out)
-			}
-			fmt.Println(cmd)
-
+	matser := serv.ConnectedMaster
+	conn := *matser.Conn
+	reader := bufio.NewReader(conn)
+	for {
+		cmd, err := server.ReadCommand(reader)
+		if err == io.EOF {
+			return
 		}
-	}
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = serv.ProcessCommand(&conn, &cmd)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(cmd)
 
+	}
 }
 
 func handleConnection(conn net.Conn, serv *server.Server) {
@@ -70,10 +69,8 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn) // Add buffered writer for better performance
 	for {
 		cmd, err := server.ReadCommand(reader)
-		fmt.Println(cmd)
 		if err == io.EOF {
 			return
 		}
@@ -81,9 +78,11 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 			fmt.Println(err)
 			continue
 		}
-		out := serv.ProcessCommand(&conn, &cmd)
-		writer.Write(out)
-		writer.Flush()
+		fmt.Println(cmd)
+		err = serv.ProcessCommand(&conn, &cmd)
+		if err != nil {
+			fmt.Println(err)
+		}
 
 	}
 }

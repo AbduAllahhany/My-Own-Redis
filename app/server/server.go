@@ -5,12 +5,13 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/engine"
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"math/big"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/codecrafters-io/redis-starter-go/app/engine"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 )
 
 //todo
@@ -49,7 +50,7 @@ type Server struct {
 	Role             string
 	offset           int
 	ConnectedReplica []Node
-	ConnectedMaster  []Node
+	ConnectedMaster  Node
 }
 
 // type shitt
@@ -87,13 +88,10 @@ func NewServer(config Configuration) (*Server, error) {
 		Listener:         l,
 		Role:             role,
 		ConnectedReplica: nil,
-		ConnectedMaster:  nil,
 	}
 	if role == Slave {
-		serv.ConnectedMaster = []Node{
-			{
-				Conn: &masterConn,
-			},
+		serv.ConnectedMaster = Node{
+			Conn: &masterConn,
 		}
 		NewSlave(&serv)
 	}
@@ -171,58 +169,59 @@ func NewSlave(serv *Server) error {
 		Handle: nil,
 	}
 	buf := make([]byte, 1024)
-	for _, node := range serv.ConnectedMaster {
-		conn := *node.Conn
-		writer := bufio.NewWriter(conn)
-		err := WriteCommand(writer, &pingCmd)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		err = WriteCommand(writer, &repliconfPortCmd)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		err = WriteCommand(writer, &repliconfCapCmd)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		err = WriteCommand(writer, &psyncCmd)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
+	node := serv.ConnectedMaster
+	conn := *node.Conn
+	writer := bufio.NewWriter(conn)
+	reader := bufio.NewReader(conn)
+	err := WriteCommand(writer, &pingCmd)
+	if err != nil {
+		fmt.Println(err)
+		return err
 	}
+	_, err = conn.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	err = WriteCommand(writer, &repliconfPortCmd)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_, err = reader.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	err = WriteCommand(writer, &repliconfCapCmd)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_, err = reader.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	err = WriteCommand(writer, &psyncCmd)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_, err = reader.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_, err = conn.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println(string(buf))
+
 	return nil
 }

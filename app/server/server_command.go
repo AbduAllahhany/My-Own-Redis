@@ -143,4 +143,6 @@ func sendbgserverReplication(request *Request) {
 	res, _ := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
 	out := resp.BulkStringDecoder(string(res))
 	conn.Write(out[:len(out)-2])
+	/////////////////////////////
+	conn.Write([]byte("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n"))
 }

@@ -73,12 +73,14 @@ func Keys(request *Request) []byte {
 	pattern := args[0]
 	var matches []string
 	for key, _ := range *dict {
-		match, err := filepath.Match(pattern, key)
-		if err != nil {
-			return resp.ErrorDecoder("ERR encoding")
-		}
-		if match {
-			matches = append(matches, key)
+		if (*dict)[key].Value() != nil {
+			match, err := filepath.Match(pattern, key)
+			if err != nil {
+				return resp.ErrorDecoder("ERR encoding")
+			}
+			if match {
+				matches = append(matches, key)
+			}
 		}
 	}
 	return resp.ArrayDecoder(matches)

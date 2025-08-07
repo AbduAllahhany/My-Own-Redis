@@ -10,13 +10,13 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
-//Todo
-//1)Testing
-//2)Implement my own rdb reader
-//2)Memory Optimization
-//3)Connection pool
-//4)Logging
-
+// Todo
+// 1)Testing
+// 2)Implement my own rdb reader
+// 2)Memory Optimization
+// 3)Connection pool
+// 4)Logging
+// 4)instead of go routine can use low level epoll
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -27,11 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 	l := serv.Listener
-	fmt.Println(serv.Role)
 	defer l.Close()
-	if serv.Role == server.Slave {
-		go handleMasterConnection(serv)
-	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -39,29 +35,6 @@ func main() {
 			os.Exit(1)
 		}
 		go handleConnection(&conn, serv)
-	}
-}
-
-func handleMasterConnection(serv *server.Server) {
-	master := serv.ConnectedMaster
-	conn := master.Conn
-	reader := master.Reader
-	writer := master.Writer
-	fmt.Println("i am in handle master connection")
-	for {
-		cmd, err := server.ReadCommand(reader)
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			fmt.Println(err)
-		}
-		err = serv.ProcessCommand(conn, reader, writer, &cmd)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(cmd)
-
 	}
 }
 

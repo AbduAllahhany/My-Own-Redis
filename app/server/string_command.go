@@ -33,53 +33,74 @@ func IndexOf(slice []string, item string) int {
 // [GET]
 // [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
 func Set(request *Request) []byte {
-	store := request.Serv.Db
 	args := request.Args
-	if len(args) < 2 || len(args) > 5 {
-		return resp.ErrorDecoder("ERR syntax error")
+	if len(args) < 2 {
+		return resp.ErrorDecoder("ERR wrong number of arguments for 'set' command")
 	}
-	mu := store.Mu
-	mu.Lock()
-	dict := *store.Dict
+
 	key := args[0]
 	value := args[1]
 
-	//optional
-	exIndex := IndexOf(args, "EX")
-	pxIndex := IndexOf(args, "PX")
 	var ttl time.Duration
-	if exIndex != -1 && pxIndex == -1 {
-		amount, err := strconv.Atoi(args[exIndex+1])
-		if err != nil {
-			return resp.ErrorDecoder("ERR value is not an integer or out of range")
-		}
-		ttl = expirationOptions[strings.ToUpper(args[exIndex])] * time.Duration(amount)
-	} else if pxIndex != -1 && exIndex == -1 {
-		amount, err := strconv.Atoi(args[pxIndex+1])
-		if err != nil {
-			return resp.ErrorDecoder("ERR value is not an integer or out of range")
-		}
-		ttl = expirationOptions[strings.ToUpper(args[pxIndex])] * time.Duration(amount)
-	}
-	var ex time.Time
-	if ttl != 0 {
-		ex = time.Now().Add(ttl)
-	}
-	dict[key] = engine.RedisString{
-		Data:       value,
-		Expiration: ex,
-	}
-	mu.Unlock()
+	var expiration time.Time
+	var returnOldValue bool
 
-	if Contains(args, "GET") {
-		req := Request{
-			Serv: request.Serv,
-			Args: []string{
-				args[0],
-			},
-			Conn: request.Conn,
+	// Parse optional flags
+	for i := 2; i < len(args); i++ {
+		arg := strings.ToUpper(args[i])
+		switch arg {
+		case "EX":
+			if i+1 >= len(args) {
+				return resp.ErrorDecoder("ERR syntax error")
+			}
+			seconds, err := strconv.Atoi(args[i+1])
+			if err != nil {
+				return resp.ErrorDecoder("ERR invalid EX time")
+			}
+			ttl = time.Second * time.Duration(seconds)
+			i++
+		case "PX":
+			if i+1 >= len(args) {
+				return resp.ErrorDecoder("ERR syntax error")
+			}
+			ms, err := strconv.Atoi(args[i+1])
+			if err != nil {
+				return resp.ErrorDecoder("ERR invalid PX time")
+			}
+			ttl = time.Millisecond * time.Duration(ms)
+			i++
+		case "GET":
+			returnOldValue = true
+		default:
+			return resp.ErrorDecoder("ERR syntax error")
 		}
-		return Get(&req)
+	}
+
+	if ttl > 0 {
+		expiration = time.Now().Add(ttl)
+	}
+
+	store := request.Serv.Db
+	store.Mu.Lock()
+	defer store.Mu.Unlock()
+
+	// Retrieve old value if requested
+	var oldValue string
+	if returnOldValue {
+		if val, ok := (*store.Dict)[key]; ok {
+			// Check if expired
+			oldValue = val.Value().(string)
+		}
+	}
+
+	// Set the new value
+	(*store.Dict)[key] = engine.RedisString{
+		Data:       value,
+		Expiration: expiration,
+	}
+
+	if returnOldValue {
+		return resp.SimpleStringDecoder(oldValue)
 	}
 
 	return resp.SimpleStringDecoder("OK")
@@ -93,8 +114,8 @@ func Get(request *Request) []byte {
 	mu := store.Mu
 	mu.RLock()
 	defer mu.RUnlock()
-	dict := *store.Dict
-	obj := dict[args[0]]
+	dict := store.Dict
+	obj := (*dict)[args[0]]
 	if obj == nil {
 		return []byte(resp.Nil)
 	}

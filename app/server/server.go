@@ -5,14 +5,16 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/engine"
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"io"
 	"math/big"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/engine"
+	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 )
 
 //todo
@@ -63,7 +65,7 @@ func (r Replica) Write(p []byte) (n int, err error) {
 
 type Server struct {
 	Id               string
-	Db               engine.DbStore
+	Db               *engine.DbStore
 	Configuration    Configuration
 	Listener         net.Listener
 	Role             string
@@ -79,65 +81,77 @@ func NewServer(config Configuration) (*Server, error) {
 	dict := rdb.Encode(path)
 	db := engine.DbStore{
 		Dict: &dict,
-		Mu:   sync.RWMutex{},
+		Mu:   &sync.RWMutex{},
 	}
-	ConfigLookup = configToMap(config)
-	l, err := net.Listen("tcp", "0.0.0.0:"+config.Port)
+	serverAddress := net.JoinHostPort("localhost", config.Port)
+
+	//set up networking
+	l, err := net.Listen("tcp", serverAddress)
 	if err != nil {
 		return nil, err
-	}
-	parts := strings.Split(config.MasterInfo, " ")
-	if len(parts) != 2 {
-		fmt.Println("Invalid replica address. Expected 'host port'")
-	}
-	masterIp := parts[0]
-	masterPort := parts[1]
-	address := net.JoinHostPort(masterIp, masterPort)
-	masterConn, err := net.Dial("tcp", address)
-
-	role := Master
-	if err == nil {
-		role = Slave
 	}
 
 	serv := Server{
 		Id:               generateID(),
-		Db:               db,
+		Db:               &db,
 		Configuration:    config,
 		Listener:         l,
-		Role:             role,
+		Role:             Master,
 		ConnectedReplica: nil,
 	}
-	if role == Slave {
-		serv.ConnectedMaster = Node{
-			Conn:   &masterConn,
-			Reader: bufio.NewReader(masterConn),
-			Writer: bufio.NewWriter(masterConn),
-		}
-		NewSlave(&serv)
-	}
+	go connectToMaster(&serv, &config)
 	return &serv, nil
 }
-
+func connectToMaster(serv *Server, config *Configuration) {
+	parts := strings.Split(config.MasterInfo, " ")
+	if len(parts) != 2 {
+		return
+	}
+	masterIp := parts[0]
+	masterPort := parts[1]
+	address := net.JoinHostPort(masterIp, masterPort)
+	_, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return
+	}
+	serv.Role = Slave
+	fmt.Println(serv.Role)
+	var masterConn net.Conn
+	for {
+		masterConn, err = net.Dial("tcp", address)
+		if err == nil {
+			break
+		}
+	}
+	serv.ConnectedMaster = Node{
+		Conn:   &masterConn,
+		Reader: bufio.NewReader(masterConn),
+		Writer: bufio.NewWriter(masterConn),
+	}
+	NewSlave(serv)
+}
 func NewConfiguration() Configuration {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
 	port := flag.String("port", "6379", "Port")
-	replica := flag.String("replicaof", "Bad Address", "Is Replica")
+	replica := flag.String("replicaof", "nil", "Is Replica")
 	flag.Parse()
-	return Configuration{
+	confg := Configuration{
 		Dir:        *dir,
 		DbFilename: *dbfilename,
 		Port:       *port,
 		MasterInfo: *replica,
 	}
+	ConfigLookup = configToMap(&confg)
+	return confg
 }
 
 // helper
-func configToMap(config Configuration) map[string]string {
+func configToMap(config *Configuration) map[string]string {
 	return map[string]string{
 		"dir":        config.Dir,
 		"dbfilename": config.DbFilename,
+		"port":       config.Port,
 	}
 }
 func generateID() string {
@@ -241,6 +255,7 @@ func NewSlave(serv *Server) error {
 		fmt.Println(err)
 		return err
 	}
+	go handleMasterConnection(serv)
 	return nil
 }
 func readRDBSnapshot(reader *bufio.Reader) ([]byte, error) {
@@ -281,15 +296,44 @@ func sendBgServerReplication(request *Request) {
 	}()
 }
 
+// to be refactored as event loop or smth
 func writeBufferToReplica(request *Request) {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
 	for {
-		for _, replica := range request.Serv.ConnectedReplica {
-			select {
-			case buf := <-replica.Buffer:
-				replica.Write(buf)
-			default:
-				// no data available; skip this replica for now
+		select {
+		case <-ticker.C:
+			for _, replica := range request.Serv.ConnectedReplica {
+				select {
+				case buf := <-replica.Buffer:
+					replica.Write(buf)
+				default:
+					// no data available
+				}
 			}
 		}
+	}
+}
+
+func handleMasterConnection(serv *Server) {
+	master := serv.ConnectedMaster
+	conn := master.Conn
+	reader := master.Reader
+	writer := master.Writer
+	fmt.Println("i am in handle master connection")
+	for {
+		cmd, err := ReadCommand(reader)
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = serv.ProcessCommand(conn, reader, writer, &cmd)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(cmd)
+
 	}
 }

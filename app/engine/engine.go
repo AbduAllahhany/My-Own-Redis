@@ -7,7 +7,7 @@ import (
 
 type DbStore struct {
 	Dict *map[string]RedisObj
-	Mu   sync.RWMutex
+	Mu   *sync.RWMutex
 }
 
 type RedisObj interface {

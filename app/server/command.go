@@ -46,6 +46,7 @@ type Command struct {
 	Handle     HandlerCmd
 }
 
+// to be improved
 func ReadCommand(reader *bufio.Reader) (Command, error) {
 	//first line
 	line, err := reader.ReadString('\n')

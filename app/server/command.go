@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
@@ -38,12 +37,28 @@ var lookUpCommands = map[string]HandlerCmd{
 var writeCommand = map[string]bool{
 	"SET": true,
 }
+var propagateCommand = map[string]bool{
+	"SET": true,
+}
+var suppressReplyCommand = map[string]bool{
+	"SET":      true,
+	"GET":      true,
+	"ECHO":     true,
+	"PING":     true,
+	"CONFIG":   true,
+	"KEYS":     true,
+	"INFO":     false,
+	"PSYNC":    true,
+	"REPLCONF": false,
+}
 
 type Command struct {
-	Name       string
-	Args       []string
-	IsWritable bool
-	Handle     HandlerCmd
+	Name           string
+	Args           []string
+	IsPropagatable bool
+	SuppressReply  bool
+	IsWritable     bool
+	Handle         HandlerCmd
 }
 
 // to be improved
@@ -89,49 +104,45 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (serv *Server) ProcessCommand(conn *net.Conn, reader *bufio.Reader, writer *bufio.Writer, cmd *Command) error {
-	handler := cmd.Handle
+func ProcessCommand(request *Request) ([]byte, error) {
+	handler := request.Cmd.Handle
+	serv := request.Serv
+	cmd := request.Cmd
 	if handler == nil {
-		writer.Write(resp.ErrorDecoder("ERR unknown command"))
-		writer.Flush()
-		return ErrInvalidFormat
+		return resp.ErrorDecoder("ERR unknown command"), ErrInvalidFormat
 
 	}
-	req := Request{
-		Serv:   serv,
-		Args:   cmd.Args,
-		Conn:   conn,
-		Reader: reader,
-		Writer: writer,
-	}
-	out := handler(&req)
-	writer.Write(out)
-	writer.Flush()
-	if cmd.IsWritable {
-		for _, replica := range serv.ConnectedReplica {
+	out := handler(request)
+	//if request.Cmd.IsPropagatable {
+	fmt.Println(cmd, serv.Offset)
+	serv.Offset += len(encodeCommand(cmd))
+	fmt.Println(serv.Offset)
+
+	//}
+	if cmd.IsPropagatable && serv.ConnectedReplica != nil {
+		for _, replica := range *serv.ConnectedReplica {
 			WriteToSlaveBuffer(&replica, cmd)
 		}
 	}
-	return nil
+	return out, nil
 }
-
-// helper function
 func decodeCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
 		return Command{}, ErrEmptyCommand
 	}
 	cmdName := strings.ToUpper(parts[0])
 	cmd := Command{
-		Name:       cmdName,
-		Handle:     lookUpCommands[strings.ToUpper(parts[0])],
-		IsWritable: writeCommand[cmdName],
+		Name:           cmdName,
+		IsPropagatable: propagateCommand[cmdName],
+		SuppressReply:  suppressReplyCommand[cmdName],
+		IsWritable:     writeCommand[cmdName],
+		Handle:         lookUpCommands[strings.ToUpper(parts[0])],
 	}
 	if len(parts) > 1 {
 		cmd.Args = parts[1:]
 	}
 	return cmd, nil
 }
-
 func readBulkString(reader *bufio.Reader) (string, error) {
 
 	//first line
@@ -176,7 +187,6 @@ func readBulkString(reader *bufio.Reader) (string, error) {
 	}
 	return line[:len(line)-2], nil
 }
-
 func readNumbersFromLine(line string) (int, error) {
 	line = strings.TrimRight(line, resp.CLRF)
 	line = line[1:]
@@ -197,7 +207,6 @@ func WriteCommand(writer *bufio.Writer, cmd *Command) error {
 	err = writer.Flush()
 	return err
 }
-
 func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
 	res := encodeCommand(cmd)
 	replica.Buffer <- res

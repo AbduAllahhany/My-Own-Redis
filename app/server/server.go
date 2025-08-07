@@ -30,12 +30,11 @@ const (
 )
 
 type Request struct {
-	Serv *Server
-	Args []string
-	//metadata
+	Serv   *Server
 	Conn   *net.Conn
 	Reader *bufio.Reader
 	Writer *bufio.Writer
+	Cmd    *Command
 }
 type Configuration struct {
 	Dir        string
@@ -45,6 +44,7 @@ type Configuration struct {
 }
 type Node struct {
 	Id     string
+	Offset int
 	Conn   *net.Conn
 	Reader *bufio.Reader
 	Writer *bufio.Writer
@@ -69,13 +69,14 @@ type Server struct {
 	Configuration    Configuration
 	Listener         net.Listener
 	Role             string
-	offset           int
-	ConnectedReplica []Replica
-	ConnectedMaster  Node
+	Offset           int
+	ConnectedReplica *[]Replica
+	ConnectedMaster  *Node
 }
 
 // type shitt
 func NewServer(config Configuration) (*Server, error) {
+	ConfigLookup = configToMap(&config)
 	//create data store instance
 	path := config.Dir + "/" + config.DbFilename
 	dict := rdb.Encode(path)
@@ -97,6 +98,7 @@ func NewServer(config Configuration) (*Server, error) {
 		Configuration:    config,
 		Listener:         l,
 		Role:             Master,
+		Offset:           0,
 		ConnectedReplica: nil,
 	}
 	go connectToMaster(&serv, &config)
@@ -123,7 +125,7 @@ func connectToMaster(serv *Server, config *Configuration) {
 			break
 		}
 	}
-	serv.ConnectedMaster = Node{
+	serv.ConnectedMaster = &Node{
 		Conn:   &masterConn,
 		Reader: bufio.NewReader(masterConn),
 		Writer: bufio.NewWriter(masterConn),
@@ -142,7 +144,6 @@ func NewConfiguration() Configuration {
 		Port:       *port,
 		MasterInfo: *replica,
 	}
-	ConfigLookup = configToMap(&confg)
 	return confg
 }
 
@@ -303,9 +304,10 @@ func writeBufferToReplica(request *Request) {
 	for {
 		select {
 		case <-ticker.C:
-			for _, replica := range request.Serv.ConnectedReplica {
+			for _, replica := range *request.Serv.ConnectedReplica {
 				select {
 				case buf := <-replica.Buffer:
+					replica.Node.Offset += len(buf)
 					replica.Write(buf)
 				default:
 					// no data available
@@ -329,11 +331,21 @@ func handleMasterConnection(serv *Server) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		err = serv.ProcessCommand(conn, reader, writer, &cmd)
+		request := Request{
+			Serv:   serv,
+			Conn:   conn,
+			Reader: reader,
+			Writer: writer,
+			Cmd:    &cmd,
+		}
+		out, err := ProcessCommand(&request)
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println(cmd)
-
+		if !cmd.SuppressReply {
+			writer.Write(out)
+			writer.Flush()
+		}
+		fmt.Println("from handle master", cmd)
 	}
 }

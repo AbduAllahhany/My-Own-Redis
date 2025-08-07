@@ -33,7 +33,7 @@ func IndexOf(slice []string, item string) int {
 // [GET]
 // [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
 func Set(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) < 2 {
 		return resp.ErrorDecoder("ERR wrong number of arguments for 'set' command")
 	}
@@ -107,7 +107,7 @@ func Set(request *Request) []byte {
 }
 func Get(request *Request) []byte {
 	store := request.Serv.Db
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -127,5 +127,9 @@ func Get(request *Request) []byte {
 		return []byte(resp.Nil)
 	}
 	str := x.(string)
+	if len(str) == 0 {
+		return resp.BulkStringDecoder(str)
+	}
 	return resp.SimpleStringDecoder(str)
+
 }

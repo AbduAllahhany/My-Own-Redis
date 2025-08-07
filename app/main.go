@@ -54,11 +54,18 @@ func handleConnection(connection *net.Conn, serv *server.Server) {
 			fmt.Println(err)
 			continue
 		}
-		fmt.Println(cmd)
-		err = serv.ProcessCommand(&conn, reader, writer, &cmd)
+		request := server.Request{
+			Serv:   serv,
+			Conn:   connection,
+			Reader: reader,
+			Writer: writer,
+			Cmd:    &cmd,
+		}
+		out, err := server.ProcessCommand(&request)
 		if err != nil {
 			fmt.Println(err)
 		}
-
+		writer.Write(out)
+		writer.Flush()
 	}
 }

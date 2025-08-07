@@ -11,14 +11,14 @@ import (
 
 // Server commands
 func Echo(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	return resp.BulkStringDecoder(args[0])
 }
 func Ping(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) != 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -27,41 +27,31 @@ func Ping(request *Request) []byte {
 
 // Configuration
 func Config(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) == 0 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
 	if strings.ToUpper(args[0]) == "GET" {
-		req := Request{
-			Serv: request.Serv,
-			Args: args[1:],
-			Conn: request.Conn,
+		if len(args) == 1 {
+			return resp.ErrorDecoder("ERR syntax error")
 		}
-		return configGet(&req)
+		var arr []string
+		for _, arg := range args[1:] {
+			val, ok := ConfigLookup[arg]
+			if ok {
+				arr = append(arr, arg)
+				arr = append(arr, val)
+			}
+		}
+		return resp.ArrayDecoder(arr)
 	}
 
 	return []byte(resp.Nil)
 }
-func configGet(request *Request) []byte {
-	args := request.Args
-
-	if len(args) == 0 {
-		return resp.ErrorDecoder("ERR syntax error")
-	}
-	var arr []string
-	for _, arg := range args {
-		val, ok := ConfigLookup[arg]
-		if ok {
-			arr = append(arr, arg)
-			arr = append(arr, val)
-		}
-	}
-	return resp.ArrayDecoder(arr)
-}
 
 // Blocking function
 func Keys(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -86,7 +76,7 @@ func Keys(request *Request) []byte {
 	return resp.ArrayDecoder(matches)
 }
 func Info(request *Request) []byte {
-	args := request.Args
+	args := request.Cmd.Args
 	if len(args) != 1 {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
@@ -107,22 +97,15 @@ func Info(request *Request) []byte {
 }
 
 func Replconfg(request *Request) []byte {
-	if strings.ToUpper(request.Args[0]) == "GETACK" {
-		req := Request{
-			Serv: request.Serv,
-			Args: request.Args[1:],
-			Conn: request.Conn,
+	if strings.ToUpper(request.Cmd.Args[0]) == "GETACK" {
+		out := []string{
+			"REPLCONF", "ACK", strconv.Itoa(request.Serv.Offset),
 		}
-		return replconfgGetAck(&req)
+		return resp.ArrayDecoder(out)
 	}
 	return resp.SimpleStringDecoder("OK")
 }
-func replconfgGetAck(request *Request) []byte {
-	out := []string{
-		"REPLCONF", "ACK", "0",
-	}
-	return resp.ArrayDecoder(out)
-}
+
 func Psync(request *Request) []byte {
 	conn := *request.Conn
 	writer := request.Writer
@@ -136,13 +119,14 @@ func Psync(request *Request) []byte {
 		Buffer: make(chan []byte),
 	}
 	if request.Serv.ConnectedReplica == nil {
-		request.Serv.ConnectedReplica = []Replica{
+		request.Serv.ConnectedReplica = &[]Replica{
 			replica,
 		}
 	} else {
-		request.Serv.ConnectedReplica = append(request.Serv.ConnectedReplica, replica)
+		*request.Serv.ConnectedReplica = append(*request.Serv.ConnectedReplica, replica)
 	}
-	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
+	request.Serv.Offset = 0
+	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.Offset)
 	writer.Write(resp.SimpleStringDecoder(out))
 	writer.Flush()
 	go sendBgServerReplication(request)

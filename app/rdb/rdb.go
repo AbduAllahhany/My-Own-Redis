@@ -3,11 +3,12 @@ package rdb
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/hdt3213/rdb/encoder"
 	"github.com/hdt3213/rdb/parser"
-	"os"
-	"time"
 )
 
 func Encode(path string) map[string]engine.RedisObj {
@@ -41,7 +42,7 @@ func Encode(path string) map[string]engine.RedisObj {
 	return dict
 }
 
-func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
+func GenerateRDBBinary(dict *map[string]engine.RedisObj) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := encoder.NewEncoder(&buf)
 	err := enc.WriteHeader()
@@ -73,10 +74,10 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 	}
 
 	// Only write DB header and objects if dict is not empty
-	if len(dict) > 0 {
-		dictSize := len(dict)
+	if len(*dict) > 0 {
+		dictSize := len(*dict)
 		expiringKeys := 0
-		for _, redisObj := range dict {
+		for _, redisObj := range *dict {
 			if redisObj.HasExpiration() {
 				expiringKeys++
 			}
@@ -86,7 +87,7 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 			return nil, fmt.Errorf("failed to write DB header: %w", err)
 		}
 
-		for key, redisObj := range dict {
+		for key, redisObj := range *dict {
 			var err error
 
 			switch redisObj.Type() {
@@ -113,7 +114,7 @@ func GenerateRDBBinary(dict map[string]engine.RedisObj) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-func GenerateRDBFile(dict map[string]engine.RedisObj, filename string) error {
+func GenerateRDBFile(dict *map[string]engine.RedisObj, filename string) error {
 	data, err := GenerateRDBBinary(dict)
 	if err != nil {
 		return err

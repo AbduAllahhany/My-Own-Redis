@@ -1,11 +1,11 @@
 package server
 
 import (
+	"bufio"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
@@ -72,7 +72,7 @@ func Keys(request *Request) []byte {
 	defer mu.Unlock()
 	pattern := args[0]
 	var matches []string
-	for key, _ := range dict {
+	for key, _ := range *dict {
 		match, err := filepath.Match(pattern, key)
 		if err != nil {
 			return resp.ErrorDecoder("ERR encoding")
@@ -123,26 +123,26 @@ func replconfgGetAck(request *Request) []byte {
 }
 func Psync(request *Request) []byte {
 	conn := *request.Conn
-	replica := Node{
-		Id:   generateID(),
-		Conn: &conn,
+	writer := request.Writer
+	replica := Replica{
+		Node: Node{
+			Id:     generateID(),
+			Conn:   &conn,
+			Reader: bufio.NewReader(conn),
+			Writer: bufio.NewWriter(conn),
+		},
+		Buffer: make(chan []byte),
 	}
 	if request.Serv.ConnectedReplica == nil {
-		request.Serv.ConnectedReplica = []Node{
+		request.Serv.ConnectedReplica = []Replica{
 			replica,
 		}
 	} else {
 		request.Serv.ConnectedReplica = append(request.Serv.ConnectedReplica, replica)
 	}
 	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.offset)
-	go sendbgserverReplication(request)
-	return resp.SimpleStringDecoder(out)
-}
-func sendbgserverReplication(request *Request) {
-	conn := *request.Conn
-	res, _ := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
-	out := resp.BulkStringDecoder(string(res))
-	conn.Write(out[:len(out)-2])
-	/////////////////////////////
-	conn.Write([]byte("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n"))
+	writer.Write(resp.SimpleStringDecoder(out))
+	writer.Flush()
+	go sendBgServerReplication(request)
+	return nil
 }

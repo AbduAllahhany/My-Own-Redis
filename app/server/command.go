@@ -80,7 +80,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	} else {
 		return Command{}, ErrInvalidFormat
 	}
-	cmd, err := parseCommand(parts)
+	cmd, err := decodeCommand(parts)
 
 	if err != nil {
 		return Command{}, err
@@ -88,32 +88,34 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	return cmd, nil
 }
-func (serv *Server) ProcessCommand(connection *net.Conn, cmd *Command) error {
+func (serv *Server) ProcessCommand(conn *net.Conn, reader *bufio.Reader, writer *bufio.Writer, cmd *Command) error {
 	handler := cmd.Handle
-	conn := *connection
 	if handler == nil {
-		conn.Write(resp.ErrorDecoder("ERR unknown command"))
+		writer.Write(resp.ErrorDecoder("ERR unknown command"))
+		writer.Flush()
 		return ErrInvalidFormat
+
 	}
 	req := Request{
-		Serv: serv,
-		Args: cmd.Args,
-		Conn: &conn,
+		Serv:   serv,
+		Args:   cmd.Args,
+		Conn:   conn,
+		Reader: reader,
+		Writer: writer,
 	}
 	out := handler(&req)
-	conn.Write(out)
+	writer.Write(out)
+	writer.Flush()
 	if cmd.IsWritable {
 		for _, replica := range serv.ConnectedReplica {
-			replicaConn := *replica.Conn
-			writer := bufio.NewWriter(replicaConn)
-			WriteCommand(writer, cmd)
+			WriteToSlaveBuffer(&replica, cmd)
 		}
 	}
 	return nil
 }
 
 // helper function
-func parseCommand(parts []string) (Command, error) {
+func decodeCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
 		return Command{}, ErrEmptyCommand
 	}
@@ -183,12 +185,19 @@ func readNumbersFromLine(line string) (int, error) {
 	}
 	return n, nil
 }
-
-func WriteCommand(writer *bufio.Writer, cmd *Command) error {
+func encodeCommand(cmd *Command) []byte {
 	out := []string{cmd.Name}
 	out = append(out, cmd.Args...)
-	result := resp.ArrayDecoder(out)
+	return resp.ArrayDecoder(out)
+}
+func WriteCommand(writer *bufio.Writer, cmd *Command) error {
+	result := encodeCommand(cmd)
 	_, err := writer.Write(result)
 	err = writer.Flush()
 	return err
+}
+
+func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
+	res := encodeCommand(cmd)
+	replica.Buffer <- res
 }

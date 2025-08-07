@@ -38,15 +38,16 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConnection(conn, serv)
+		go handleConnection(&conn, serv)
 	}
 }
 
 func handleMasterConnection(serv *server.Server) {
-	//buf := make([]byte, 1024)
-	matser := serv.ConnectedMaster
-	conn := *matser.Conn
-	reader := bufio.NewReader(conn)
+	master := serv.ConnectedMaster
+	conn := master.Conn
+	reader := master.Reader
+	writer := master.Writer
+	fmt.Println("i am in handle master connection")
 	for {
 		cmd, err := server.ReadCommand(reader)
 		if err == io.EOF {
@@ -55,7 +56,7 @@ func handleMasterConnection(serv *server.Server) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		err = serv.ProcessCommand(&conn, &cmd)
+		err = serv.ProcessCommand(conn, reader, writer, &cmd)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -64,11 +65,13 @@ func handleMasterConnection(serv *server.Server) {
 	}
 }
 
-func handleConnection(conn net.Conn, serv *server.Server) {
+func handleConnection(connection *net.Conn, serv *server.Server) {
+	conn := *connection
 	defer conn.Close()
 	defer fmt.Println("connection closed")
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
 	for {
 		cmd, err := server.ReadCommand(reader)
 		if err == io.EOF {
@@ -79,7 +82,7 @@ func handleConnection(conn net.Conn, serv *server.Server) {
 			continue
 		}
 		fmt.Println(cmd)
-		err = serv.ProcessCommand(&conn, &cmd)
+		err = serv.ProcessCommand(&conn, reader, writer, &cmd)
 		if err != nil {
 			fmt.Println(err)
 		}

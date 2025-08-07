@@ -5,13 +5,14 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"math/big"
-	"net"
-	"strings"
-	"sync"
-
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"io"
+	"math/big"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
 )
 
 //todo
@@ -30,7 +31,9 @@ type Request struct {
 	Serv *Server
 	Args []string
 	//metadata
-	Conn *net.Conn
+	Conn   *net.Conn
+	Reader *bufio.Reader
+	Writer *bufio.Writer
 }
 type Configuration struct {
 	Dir        string
@@ -39,9 +42,25 @@ type Configuration struct {
 	MasterInfo string
 }
 type Node struct {
-	Id   string
-	Conn *net.Conn
+	Id     string
+	Conn   *net.Conn
+	Reader *bufio.Reader
+	Writer *bufio.Writer
 }
+type Replica struct {
+	Node    Node
+	Buffer  chan []byte
+	RDBDone chan struct{}
+	State   string
+}
+
+func (r Replica) Write(p []byte) (n int, err error) {
+	writer := *r.Node.Writer
+	n, err = writer.Write(p)
+	writer.Flush()
+	return n, err
+}
+
 type Server struct {
 	Id               string
 	Db               engine.DbStore
@@ -49,7 +68,7 @@ type Server struct {
 	Listener         net.Listener
 	Role             string
 	offset           int
-	ConnectedReplica []Node
+	ConnectedReplica []Replica
 	ConnectedMaster  Node
 }
 
@@ -59,7 +78,7 @@ func NewServer(config Configuration) (*Server, error) {
 	path := config.Dir + "/" + config.DbFilename
 	dict := rdb.Encode(path)
 	db := engine.DbStore{
-		Dict: dict,
+		Dict: &dict,
 		Mu:   sync.RWMutex{},
 	}
 	ConfigLookup = configToMap(config)
@@ -91,7 +110,9 @@ func NewServer(config Configuration) (*Server, error) {
 	}
 	if role == Slave {
 		serv.ConnectedMaster = Node{
-			Conn: &masterConn,
+			Conn:   &masterConn,
+			Reader: bufio.NewReader(masterConn),
+			Writer: bufio.NewWriter(masterConn),
 		}
 		NewSlave(&serv)
 	}
@@ -168,17 +189,16 @@ func NewSlave(serv *Server) error {
 		Args:   psyncCmdArgs,
 		Handle: nil,
 	}
-	buf := make([]byte, 1024)
+	//buf := make([]byte, 1024)
 	node := serv.ConnectedMaster
-	conn := *node.Conn
-	writer := bufio.NewWriter(conn)
-	reader := bufio.NewReader(conn)
+	writer := node.Writer
+	reader := node.Reader
 	err := WriteCommand(writer, &pingCmd)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	_, err = conn.Read(buf)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -189,7 +209,7 @@ func NewSlave(serv *Server) error {
 		fmt.Println(err)
 		return err
 	}
-	_, err = reader.Read(buf)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -200,7 +220,7 @@ func NewSlave(serv *Server) error {
 		fmt.Println(err)
 		return err
 	}
-	_, err = reader.Read(buf)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -211,17 +231,65 @@ func NewSlave(serv *Server) error {
 		fmt.Println(err)
 		return err
 	}
-	_, err = reader.Read(buf)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	_, err = conn.Read(buf)
+	_, err = readRDBSnapshot(reader)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println(string(buf))
-
 	return nil
+}
+func readRDBSnapshot(reader *bufio.Reader) ([]byte, error) {
+	// Read $<len>\r\n
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	lengthStr := strings.TrimSpace(line)[1:] // Remove $ and \r\n
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if length == -1 {
+		return nil, nil
+	}
+
+	// Read RDB data
+	data := make([]byte, length)
+	_, err = io.ReadFull(reader, data)
+	return data, err
+}
+func sendBgServerReplication(request *Request) {
+	writer := request.Writer
+	rdbDone := make(chan struct{})
+	go func() {
+		rdbData, _ := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
+		lengthLine := fmt.Sprintf("$%d\r\n", len(rdbData))
+		writer.Write([]byte(lengthLine)) // send bulk string header
+		writer.Write(rdbData)
+		writer.Flush()
+		close(rdbDone)
+	}()
+	go func() {
+		<-rdbDone
+		writeBufferToReplica(request)
+	}()
+}
+
+func writeBufferToReplica(request *Request) {
+	for {
+		for _, replica := range request.Serv.ConnectedReplica {
+			select {
+			case buf := <-replica.Buffer:
+				replica.Write(buf)
+			default:
+				// no data available; skip this replica for now
+			}
+		}
+	}
 }

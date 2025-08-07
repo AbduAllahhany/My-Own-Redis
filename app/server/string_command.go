@@ -1,12 +1,12 @@
 package server
 
 import (
-	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/engine"
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/engine"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 var expirationOptions = map[string]time.Duration{
@@ -40,7 +40,7 @@ func Set(request *Request) []byte {
 	}
 	mu := store.Mu
 	mu.Lock()
-	dict := store.Dict
+	dict := *store.Dict
 	key := args[0]
 	value := args[1]
 
@@ -81,7 +81,6 @@ func Set(request *Request) []byte {
 		}
 		return Get(&req)
 	}
-	fmt.Println(store)
 
 	return resp.SimpleStringDecoder("OK")
 }
@@ -94,7 +93,7 @@ func Get(request *Request) []byte {
 	mu := store.Mu
 	mu.RLock()
 	defer mu.RUnlock()
-	dict := store.Dict
+	dict := *store.Dict
 	obj := dict[args[0]]
 	if obj == nil {
 		return []byte(resp.Nil)

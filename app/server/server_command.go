@@ -166,10 +166,15 @@ func Wait(request *Request) []byte {
 
 	noOfAckedReplica := 0
 	ackedMap := make(map[string]bool)
+	num := 0
+	if request.Serv.ConnectedReplica != nil {
+		num = len(*request.Serv.ConnectedReplica)
+
+	}
 	for {
 		select {
 		case <-done:
-			return resp.IntegerDecoder(noOfAckedReplica)
+			return resp.IntegerDecoder(num)
 		case <-ticker.C:
 			for _, replica := range *request.Serv.ConnectedReplica {
 				if ackedMap[replica.Node.ReplicationId] {

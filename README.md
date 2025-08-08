@@ -81,7 +81,7 @@ cd My-Own-Redis
 ```bash
 # Quick start
 ./your_program.sh
-
+```
 
 
 #### Slave Mode

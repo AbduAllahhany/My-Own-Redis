@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -182,6 +183,7 @@ func Wait(request *Request) []byte {
 				}
 				reader := replica.Node.Reader
 				replica.Write(encodeCommand(&cmd))
+				fmt.Println("get ack * command is sent")
 				ack, err := ReadCommand(reader)
 				if err != nil || len(ack.Args) < 2 {
 					continue

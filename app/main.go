@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/server"
+	"github.com/codecrafters-io/redis-starter-go/app/utils"
 )
 
 // Todo
@@ -16,7 +17,9 @@ import (
 // 2)Memory Optimization
 // 3)Connection pool
 // 4)Logging
-// 4)instead of go routine can use low level epoll
+// 5)Read more about offset tracking and implement this
+// 6)Improve readCommand function
+// 7)server implement reader and writer
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -45,6 +48,9 @@ func handleConnection(connection *net.Conn, serv *server.Server) {
 	//create a reader source for this connection
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
+	//create connectionId for this conenction
+	connId := utils.GenerateID()
+
 	for {
 		cmd, err := server.ReadCommand(reader)
 		if err == io.EOF {
@@ -60,6 +66,7 @@ func handleConnection(connection *net.Conn, serv *server.Server) {
 			Reader: reader,
 			Writer: writer,
 			Cmd:    &cmd,
+			ConnId: connId,
 		}
 		out, err := server.ProcessCommand(&request)
 		if err != nil {

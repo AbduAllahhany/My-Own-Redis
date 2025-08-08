@@ -2,11 +2,9 @@ package server
 
 import (
 	"bufio"
-	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"strconv"
 	"strings"
@@ -15,13 +13,14 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/codecrafters-io/redis-starter-go/app/utils"
 )
 
-//todo
-//refactor this shittttttttttttttttttttttttttttttttttttttttttttttt
-//implement proper master ,slave ???
-//command ?????????????????????
-
+// todo
+// refactor this shittttttttttttttttttttttttttttttttttttttttttttttt
+// implement proper master ,slave ???
+// command ?????????????????????
+var replicaById map[string]*Replica
 var ConfigLookup map[string]string
 
 const (
@@ -35,6 +34,7 @@ type Request struct {
 	Reader *bufio.Reader
 	Writer *bufio.Writer
 	Cmd    *Command
+	ConnId string
 }
 type Configuration struct {
 	Dir        string
@@ -70,12 +70,13 @@ type Server struct {
 	Listener         net.Listener
 	Role             string
 	Offset           int
-	ConnectedReplica *[]Replica
+	ConnectedReplica *[]*Replica
 	ConnectedMaster  *Node
 }
 
 // type shitt
 func NewServer(config Configuration) (*Server, error) {
+	replicaById = make(map[string]*Replica)
 	initCommands()
 	ConfigLookup = configToMap(&config)
 	//create data store instance
@@ -94,7 +95,7 @@ func NewServer(config Configuration) (*Server, error) {
 	}
 
 	serv := Server{
-		ReplicationId:    generateID(),
+		ReplicationId:    utils.GenerateID(),
 		Db:               &db,
 		Configuration:    config,
 		Listener:         l,
@@ -118,7 +119,6 @@ func connectToMaster(serv *Server, config *Configuration) {
 		return
 	}
 	serv.Role = Slave
-	fmt.Println(serv.Role)
 	var masterConn net.Conn
 	for {
 		masterConn, err = net.Dial("tcp", address)
@@ -156,19 +156,6 @@ func configToMap(config *Configuration) map[string]string {
 		"port":       config.Port,
 	}
 }
-func generateID() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 40
-	result := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return ""
-		}
-		result[i] = charset[num.Int64()]
-	}
-	return string(result)
-}
 
 // kanye west reference
 func NewSlave(serv *Server) error {
@@ -184,7 +171,7 @@ func NewSlave(serv *Server) error {
 	repliconfPortCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfPortArgs,
-		Handle: Replconfg,
+		Handle: Replconf,
 	}
 
 	repliconfCapArgs := []string{
@@ -194,7 +181,7 @@ func NewSlave(serv *Server) error {
 	repliconfCapCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfCapArgs,
-		Handle: Replconfg,
+		Handle: Replconf,
 	}
 	psyncCmdArgs := []string{
 		"?",
@@ -308,7 +295,6 @@ func writeBufferToReplica(request *Request) {
 			for _, replica := range *request.Serv.ConnectedReplica {
 				select {
 				case buf := <-replica.Buffer:
-					replica.Node.Offset += len(buf)
 					replica.Write(buf)
 				default:
 					// no data available
@@ -331,6 +317,7 @@ func handleMasterConnection(serv *Server) {
 		}
 		if err != nil {
 			fmt.Println(err)
+			continue
 		}
 		request := Request{
 			Serv:   serv,
@@ -347,7 +334,6 @@ func handleMasterConnection(serv *Server) {
 			writer.Write(out)
 			writer.Flush()
 		}
-		fmt.Println("from handle master", cmd)
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
+const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
+
 var (
 	ErrInvalidFormat      = errors.New("invalid format")
 	ErrBulkStringTooLarge = errors.New("bulk string too large")
@@ -17,8 +19,6 @@ var (
 	ErrEmptyCommand       = errors.New("empty command")
 	ErrInvalidCommand     = errors.New("invalid command")
 )
-
-const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
 type HandlerCmd func(request *Request) []byte
 
@@ -30,6 +30,15 @@ var (
 	suppressReplyCommand map[string]bool
 )
 
+type Command struct {
+	Name           string
+	Args           []string
+	IsPropagatable bool
+	SuppressReply  bool
+	IsWritable     bool
+	Handle         HandlerCmd
+}
+
 func initCommands() {
 	lookUpCommands = map[string]HandlerCmd{
 		"SET":      Set,
@@ -40,7 +49,7 @@ func initCommands() {
 		"KEYS":     Keys,
 		"INFO":     Info,
 		"PSYNC":    Psync,
-		"REPLCONF": Replconfg,
+		"REPLCONF": Replconf,
 		"WAIT":     Wait,
 	}
 
@@ -59,19 +68,10 @@ func initCommands() {
 		"PING":     true,
 		"CONFIG":   true,
 		"KEYS":     true,
-		"INFO":     false,
+		"INFO":     true,
 		"PSYNC":    true,
 		"REPLCONF": false,
 	}
-}
-
-type Command struct {
-	Name           string
-	Args           []string
-	IsPropagatable bool
-	SuppressReply  bool
-	IsWritable     bool
-	Handle         HandlerCmd
 }
 
 // to be improved
@@ -109,6 +109,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	} else {
 		return Command{}, ErrInvalidFormat
 	}
+	fmt.Println(line, parts)
 	cmd, err := decodeCommand(parts)
 
 	if err != nil {
@@ -126,15 +127,13 @@ func ProcessCommand(request *Request) ([]byte, error) {
 
 	}
 	out := handler(request)
-	//if request.Cmd.IsPropagatable {
-	fmt.Println(cmd, serv.Offset)
 	serv.Offset += len(encodeCommand(cmd))
-	fmt.Println(serv.Offset)
+	//if request.Cmd.IsPropagatable {
 
 	//}
 	if cmd.IsPropagatable && serv.ConnectedReplica != nil {
 		for _, replica := range *serv.ConnectedReplica {
-			WriteToSlaveBuffer(&replica, cmd)
+			WriteToSlaveBuffer(replica, cmd)
 		}
 	}
 	return out, nil

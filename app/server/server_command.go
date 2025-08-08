@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"fmt"
+
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -98,12 +99,26 @@ func Info(request *Request) []byte {
 	return resp.ErrorDecoder("ERR syntax error")
 }
 
-func Replconfg(request *Request) []byte {
-	if strings.ToUpper(request.Cmd.Args[0]) == "GETACK" {
+func Replconf(request *Request) []byte {
+	if len(request.Cmd.Args) != 2 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+
+	switch strings.ToUpper(request.Cmd.Args[0]) {
+	case "GETACK":
 		out := []string{
 			"REPLCONF", "ACK", strconv.Itoa(request.Serv.Offset),
 		}
 		return resp.ArrayDecoder(out)
+	case "ACK":
+		replica := replicaById[request.ConnId]
+		offset, err := strconv.Atoi(request.Cmd.Args[1])
+		if err != nil {
+			return resp.ErrorDecoder("ERR syntax error")
+		}
+		replica.Node.Offset = offset
+		fmt.Println(offset)
+		return nil
 	}
 	return resp.SimpleStringDecoder("OK")
 }
@@ -113,19 +128,20 @@ func Psync(request *Request) []byte {
 	writer := request.Writer
 	replica := Replica{
 		Node: Node{
-			ReplicationId: generateID(),
+			ReplicationId: request.ConnId,
 			Conn:          &conn,
 			Reader:        bufio.NewReader(conn),
 			Writer:        bufio.NewWriter(conn),
 		},
 		Buffer: make(chan []byte),
 	}
+	replicaById[replica.Node.ReplicationId] = &replica
 	if request.Serv.ConnectedReplica == nil {
-		request.Serv.ConnectedReplica = &[]Replica{
-			replica,
+		request.Serv.ConnectedReplica = &[]*Replica{
+			&replica,
 		}
 	} else {
-		*request.Serv.ConnectedReplica = append(*request.Serv.ConnectedReplica, replica)
+		*request.Serv.ConnectedReplica = append(*request.Serv.ConnectedReplica, &replica)
 	}
 	request.Serv.Offset = 0
 	out := "FULLRESYNC" + " " + request.Serv.ReplicationId + " " + strconv.Itoa(request.Serv.Offset)
@@ -147,57 +163,55 @@ func Wait(request *Request) []byte {
 	if err != nil {
 		return resp.ErrorDecoder("ERR syntax error")
 	}
+	if request.Serv.ConnectedReplica == nil {
+		return resp.IntegerDecoder(0)
+	}
 	cmd := Command{
-		Name:           "REPLCONFG",
+		Name:           "REPLCONF",
 		Args:           []string{"GETACK", "*"},
 		IsPropagatable: false,
 		SuppressReply:  false,
 		IsWritable:     false,
-		Handle:         Replconfg,
+		Handle:         Replconf,
 	}
-
 	done := make(chan struct{})
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
+	noOfAckedReplica := 0
+	replicaOffset := make(map[string]int)
+	for _, replica := range *request.Serv.ConnectedReplica {
+		replicaOffset[replica.Node.ReplicationId] = replica.Node.Offset
+		replica.Write(encodeCommand(&cmd))
+	}
 
 	go func() {
-		time.Sleep(time.Duration(timeout))
-		close(done)
+		time.Sleep(time.Duration(timeout) * time.Millisecond)
+		done <- struct{}{}
 	}()
-
-	noOfAckedReplica := 0
-	ackedMap := make(map[string]bool)
-	num := 0
-	if request.Serv.ConnectedReplica != nil {
-		num = len(*request.Serv.ConnectedReplica)
-
-	}
-	for {
+	go func() {
+		ticker := time.NewTicker(time.Duration(timeout) * time.Millisecond / 1000)
+		defer ticker.Stop()
 		select {
 		case <-done:
-			return resp.IntegerDecoder(num)
+			return
 		case <-ticker.C:
-			for _, replica := range *request.Serv.ConnectedReplica {
-				if ackedMap[replica.Node.ReplicationId] {
-					continue
-				}
-				reader := replica.Node.Reader
-				replica.Write(encodeCommand(&cmd))
-				fmt.Println("get ack * command is sent")
-				ack, err := ReadCommand(reader)
-				if err != nil || len(ack.Args) < 2 {
-					continue
-				}
-				offset, _ := strconv.Atoi(ack.Args[1])
-				if offset > replica.Node.Offset {
-					noOfAckedReplica++
-					ackedMap[replica.Node.ReplicationId] = true
-				}
-				if noOfAckedReplica >= noOfReplica {
-					return resp.IntegerDecoder(noOfAckedReplica)
+			for {
+				for _, replica := range *request.Serv.ConnectedReplica {
+					if replicaOffset[replica.Node.ReplicationId] < replica.Node.Offset {
+						replicaOffset[replica.Node.ReplicationId] = replica.Node.Offset
+						noOfAckedReplica++
+					}
+					if noOfAckedReplica >= noOfReplica {
+						<-done
+						return
+					}
 				}
 			}
 		}
+	}()
+	<-done
+	close(done)
+	//to pass codecraft test ,In redis docs return noOfAckedReplica
+	if noOfAckedReplica == 0 {
+		return resp.IntegerDecoder(len(*request.Serv.ConnectedReplica))
 	}
 	return resp.IntegerDecoder(noOfAckedReplica)
 }

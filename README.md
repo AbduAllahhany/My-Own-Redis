@@ -80,14 +80,14 @@ cd My-Own-Redis
 #### Master Mode (Default)
 ```bash
 # Quick start
-./your_program.sh
+./your_program.sh --port 6379
 ```
 
 
 #### Slave Mode
 ```bash
 # Connect to a master running on localhost:6380
-./your_program.sh --port 6379 --replicaof "localhost 6380"
+./your_program.sh --port 6380 --replicaof "localhost 6379"
 ```
 
 ### Quick Test
@@ -120,10 +120,10 @@ The server accepts the following command-line flags:
 
 ```bash
 # Master with custom data directory
-./redis-server --dir /var/redis --dbfilename production.rdb --port 6379
+./your_program.sh  --dir /var/redis --dbfilename production.rdb --port 6379
 
 # Slave connecting to remote master
-./redis-server --port 6380 --replicaof "192.168.1.100 6379"
+./your_program.sh --port 6380 --replicaof "192.168.1.100 6379"
 ```
 
 ### Testing with Redis CLI
@@ -199,13 +199,13 @@ This implementation supports Redis-compatible master-slave replication:
 ### Master Setup
 ```bash
 # Master runs on default port 6379
-./redis-server
+./your_program.sh
 ```
 
 ### Slave Setup
 ```bash
 # Slave connects to master
-./redis-server --port 6380 --replicaof "localhost 6379"
+./your_program.sh  --port 6380 --replicaof "localhost 6379"
 ```
 
 ### Replication Features

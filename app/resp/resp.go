@@ -23,8 +23,8 @@ func BulkStringDecoder(str string) []byte {
 func ErrorDecoder(str string) []byte {
 	return []byte(string(Error) + str + CLRF)
 }
-func IntegerDecoder(num string) []byte {
-	return []byte(string(Integer) + num + CLRF)
+func IntegerDecoder(num int) []byte {
+	return []byte(string(Integer) + strconv.Itoa(num) + CLRF)
 }
 func ArrayDecoder(arr []string) []byte {
 	out := string(Array) + strconv.Itoa(len(arr)) + CLRF

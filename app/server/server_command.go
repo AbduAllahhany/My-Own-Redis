@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
@@ -85,7 +86,7 @@ func Info(request *Request) []byte {
 		out := "#REPLICATION" + resp.CLRF
 		if request.Serv.Role == Master {
 			out += "role:master" + resp.CLRF
-			out += "master_replid:" + request.Serv.Id + resp.CLRF
+			out += "master_replid:" + request.Serv.ReplicationId + resp.CLRF
 			out += "master_repl_offset:0" + resp.CLRF
 			return resp.BulkStringDecoder(out)
 		} else if request.Serv.Role == Slave {
@@ -111,10 +112,10 @@ func Psync(request *Request) []byte {
 	writer := request.Writer
 	replica := Replica{
 		Node: Node{
-			Id:     generateID(),
-			Conn:   &conn,
-			Reader: bufio.NewReader(conn),
-			Writer: bufio.NewWriter(conn),
+			ReplicationId: generateID(),
+			Conn:          &conn,
+			Reader:        bufio.NewReader(conn),
+			Writer:        bufio.NewWriter(conn),
 		},
 		Buffer: make(chan []byte),
 	}
@@ -126,9 +127,70 @@ func Psync(request *Request) []byte {
 		*request.Serv.ConnectedReplica = append(*request.Serv.ConnectedReplica, replica)
 	}
 	request.Serv.Offset = 0
-	out := "FULLRESYNC" + " " + request.Serv.Id + " " + strconv.Itoa(request.Serv.Offset)
+	out := "FULLRESYNC" + " " + request.Serv.ReplicationId + " " + strconv.Itoa(request.Serv.Offset)
 	writer.Write(resp.SimpleStringDecoder(out))
 	writer.Flush()
 	go sendBgServerReplication(request)
 	return nil
+}
+
+func Wait(request *Request) []byte {
+	if len(request.Cmd.Args) != 2 {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	noOfReplica, err := strconv.Atoi(request.Cmd.Args[0])
+	if err != nil {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	timeout, err := strconv.Atoi(request.Cmd.Args[1])
+	if err != nil {
+		return resp.ErrorDecoder("ERR syntax error")
+	}
+	cmd := Command{
+		Name:           "REPLCONFG",
+		Args:           []string{"GETACK", "*"},
+		IsPropagatable: false,
+		SuppressReply:  false,
+		IsWritable:     false,
+		Handle:         Replconfg,
+	}
+
+	done := make(chan struct{})
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	go func() {
+		time.Sleep(time.Duration(timeout))
+		close(done)
+	}()
+
+	noOfAckedReplica := 0
+	ackedMap := make(map[string]bool)
+	for {
+		select {
+		case <-done:
+			return resp.IntegerDecoder(noOfAckedReplica)
+		case <-ticker.C:
+			for _, replica := range *request.Serv.ConnectedReplica {
+				if ackedMap[replica.Node.ReplicationId] {
+					continue
+				}
+				reader := replica.Node.Reader
+				replica.Write(encodeCommand(&cmd))
+				ack, err := ReadCommand(reader)
+				if err != nil || len(ack.Args) < 2 {
+					continue
+				}
+				offset, _ := strconv.Atoi(ack.Args[1])
+				if offset > replica.Node.Offset {
+					noOfAckedReplica++
+					ackedMap[replica.Node.ReplicationId] = true
+				}
+				if noOfAckedReplica >= noOfReplica {
+					return resp.IntegerDecoder(noOfAckedReplica)
+				}
+			}
+		}
+	}
+	return resp.IntegerDecoder(noOfAckedReplica)
 }

@@ -43,11 +43,11 @@ type Configuration struct {
 	MasterInfo string
 }
 type Node struct {
-	Id     string
-	Offset int
-	Conn   *net.Conn
-	Reader *bufio.Reader
-	Writer *bufio.Writer
+	ReplicationId string
+	Offset        int
+	Conn          *net.Conn
+	Reader        *bufio.Reader
+	Writer        *bufio.Writer
 }
 type Replica struct {
 	Node    Node
@@ -64,7 +64,7 @@ func (r Replica) Write(p []byte) (n int, err error) {
 }
 
 type Server struct {
-	Id               string
+	ReplicationId    string
 	Db               *engine.DbStore
 	Configuration    Configuration
 	Listener         net.Listener
@@ -76,6 +76,7 @@ type Server struct {
 
 // type shitt
 func NewServer(config Configuration) (*Server, error) {
+	initCommands()
 	ConfigLookup = configToMap(&config)
 	//create data store instance
 	path := config.Dir + "/" + config.DbFilename
@@ -93,7 +94,7 @@ func NewServer(config Configuration) (*Server, error) {
 	}
 
 	serv := Server{
-		Id:               generateID(),
+		ReplicationId:    generateID(),
 		Db:               &db,
 		Configuration:    config,
 		Listener:         l,
@@ -348,4 +349,9 @@ func handleMasterConnection(serv *Server) {
 		}
 		fmt.Println("from handle master", cmd)
 	}
+}
+
+func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
+	res := encodeCommand(cmd)
+	replica.Buffer <- res
 }

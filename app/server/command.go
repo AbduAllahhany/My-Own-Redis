@@ -22,34 +22,47 @@ const MaxBulkStringSize = 512 * 1024 * 1024 // 512MB limit
 
 type HandlerCmd func(request *Request) []byte
 
-// Register command
-var lookUpCommands = map[string]HandlerCmd{
-	"SET":      Set,
-	"GET":      Get,
-	"ECHO":     Echo,
-	"PING":     Ping,
-	"CONFIG":   Config,
-	"KEYS":     Keys,
-	"INFO":     Info,
-	"PSYNC":    Psync,
-	"REPLCONF": Replconfg,
-}
-var writeCommand = map[string]bool{
-	"SET": true,
-}
-var propagateCommand = map[string]bool{
-	"SET": true,
-}
-var suppressReplyCommand = map[string]bool{
-	"SET":      true,
-	"GET":      true,
-	"ECHO":     true,
-	"PING":     true,
-	"CONFIG":   true,
-	"KEYS":     true,
-	"INFO":     false,
-	"PSYNC":    true,
-	"REPLCONF": false,
+// Declare all maps (uninitialized)
+var (
+	lookUpCommands       map[string]HandlerCmd
+	writeCommand         map[string]bool
+	propagateCommand     map[string]bool
+	suppressReplyCommand map[string]bool
+)
+
+func initCommands() {
+	lookUpCommands = map[string]HandlerCmd{
+		"SET":      Set,
+		"GET":      Get,
+		"ECHO":     Echo,
+		"PING":     Ping,
+		"CONFIG":   Config,
+		"KEYS":     Keys,
+		"INFO":     Info,
+		"PSYNC":    Psync,
+		"REPLCONF": Replconfg,
+		"WAIT":     Wait,
+	}
+
+	writeCommand = map[string]bool{
+		"SET": true,
+	}
+
+	propagateCommand = map[string]bool{
+		"SET": true,
+	}
+
+	suppressReplyCommand = map[string]bool{
+		"SET":      true,
+		"GET":      true,
+		"ECHO":     true,
+		"PING":     true,
+		"CONFIG":   true,
+		"KEYS":     true,
+		"INFO":     false,
+		"PSYNC":    true,
+		"REPLCONF": false,
+	}
 }
 
 type Command struct {
@@ -206,8 +219,4 @@ func WriteCommand(writer *bufio.Writer, cmd *Command) error {
 	_, err := writer.Write(result)
 	err = writer.Flush()
 	return err
-}
-func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
-	res := encodeCommand(cmd)
-	replica.Buffer <- res
 }

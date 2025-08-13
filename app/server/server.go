@@ -162,7 +162,7 @@ func NewSlave(serv *Server) error {
 	pingCmd := Command{
 		Name:   "PING",
 		Args:   nil,
-		Handle: Ping,
+		Handle: ping,
 	}
 	repliconfPortArgs := []string{
 		"listening-port",
@@ -171,7 +171,7 @@ func NewSlave(serv *Server) error {
 	repliconfPortCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfPortArgs,
-		Handle: Replconf,
+		Handle: replconf,
 	}
 
 	repliconfCapArgs := []string{
@@ -181,7 +181,7 @@ func NewSlave(serv *Server) error {
 	repliconfCapCmd := Command{
 		Name:   "REPLCONF",
 		Args:   repliconfCapArgs,
-		Handle: Replconf,
+		Handle: replconf,
 	}
 	psyncCmdArgs := []string{
 		"?",
@@ -281,12 +281,12 @@ func sendBgServerReplication(request *Request) {
 	}()
 	go func() {
 		<-rdbDone
-		writeBufferToReplica(request)
+		writeBufferToSlave(request)
 	}()
 }
 
 // to be refactored as event loop or smth
-func writeBufferToReplica(request *Request) {
+func writeBufferToSlave(request *Request) {
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -297,11 +297,14 @@ func writeBufferToReplica(request *Request) {
 				case buf := <-replica.Buffer:
 					replica.Write(buf)
 				default:
-					// no data available
 				}
 			}
 		}
 	}
+}
+func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
+	res := encodeCommand(cmd)
+	replica.Buffer <- res
 }
 
 func handleMasterConnection(serv *Server) {
@@ -327,6 +330,7 @@ func handleMasterConnection(serv *Server) {
 			Cmd:    &cmd,
 		}
 		out, err := ProcessCommand(&request)
+		serv.Offset += len(encodeCommand(&cmd))
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -335,9 +339,4 @@ func handleMasterConnection(serv *Server) {
 			writer.Flush()
 		}
 	}
-}
-
-func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
-	res := encodeCommand(cmd)
-	replica.Buffer <- res
 }

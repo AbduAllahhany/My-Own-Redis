@@ -13,30 +13,30 @@ import (
 )
 
 // Server commands
-func Echo(request *Request) []byte {
+func echo(request *Request) ([]byte, error) {
 	args := request.Cmd.Args
 	if len(args) != 1 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
-	return resp.BulkStringDecoder(args[0])
+	return resp.BulkStringDecoder(args[0]), nil
 }
-func Ping(request *Request) []byte {
+func ping(request *Request) ([]byte, error) {
 	args := request.Cmd.Args
 	if len(args) != 0 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
-	return resp.SimpleStringDecoder("PONG")
+	return resp.SimpleStringDecoder("PONG"), nil
 }
 
 // Configuration
-func Config(request *Request) []byte {
+func config(request *Request) ([]byte, error) {
 	args := request.Cmd.Args
 	if len(args) == 0 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	if strings.ToUpper(args[0]) == "GET" {
 		if len(args) == 1 {
-			return resp.ErrorDecoder("ERR syntax error")
+			return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 		}
 		var arr []string
 		for _, arg := range args[1:] {
@@ -46,17 +46,17 @@ func Config(request *Request) []byte {
 				arr = append(arr, val)
 			}
 		}
-		return resp.ArrayDecoder(arr)
+		return resp.ArrayDecoder(arr), nil
 	}
 
-	return []byte(resp.Nil)
+	return []byte(resp.Nil), nil
 }
 
 // Blocking function
-func Keys(request *Request) []byte {
+func keys(request *Request) ([]byte, error) {
 	args := request.Cmd.Args
 	if len(args) != 1 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	store := request.Serv.Db
 	dict := store.Dict
@@ -69,19 +69,19 @@ func Keys(request *Request) []byte {
 		if (*dict)[key].Value() != nil {
 			match, err := filepath.Match(pattern, key)
 			if err != nil {
-				return resp.ErrorDecoder("ERR encoding")
+				return resp.ErrorDecoder("ERR encoding"), ErrInvalidFormat
 			}
 			if match {
 				matches = append(matches, key)
 			}
 		}
 	}
-	return resp.ArrayDecoder(matches)
+	return resp.ArrayDecoder(matches), nil
 }
-func Info(request *Request) []byte {
+func info(request *Request) ([]byte, error) {
 	args := request.Cmd.Args
 	if len(args) != 1 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	if strings.ToUpper(args[0]) == "REPLICATION" {
 
@@ -89,19 +89,19 @@ func Info(request *Request) []byte {
 		if request.Serv.Role == Master {
 			out += "role:master" + resp.CLRF
 			out += "master_replid:" + request.Serv.ReplicationId + resp.CLRF
-			out += "master_repl_offset:0" + resp.CLRF
-			return resp.BulkStringDecoder(out)
+			out += "master_repl_offset:" + strconv.Itoa(request.Serv.Offset) + resp.CLRF
+			return resp.BulkStringDecoder(out), nil
 		} else if request.Serv.Role == Slave {
 			out += "role:slave" + resp.CLRF
-			return resp.BulkStringDecoder(out)
+			return resp.BulkStringDecoder(out), nil
 		}
 	}
-	return resp.ErrorDecoder("ERR syntax error")
+	return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 }
 
-func Replconf(request *Request) []byte {
+func replconf(request *Request) ([]byte, error) {
 	if len(request.Cmd.Args) != 2 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 
 	switch strings.ToUpper(request.Cmd.Args[0]) {
@@ -109,21 +109,21 @@ func Replconf(request *Request) []byte {
 		out := []string{
 			"REPLCONF", "ACK", strconv.Itoa(request.Serv.Offset),
 		}
-		return resp.ArrayDecoder(out)
+		return resp.ArrayDecoder(out), nil
 	case "ACK":
 		replica := replicaById[request.ConnId]
 		offset, err := strconv.Atoi(request.Cmd.Args[1])
 		if err != nil {
-			return resp.ErrorDecoder("ERR syntax error")
+			return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 		}
 		replica.Node.Offset = offset
 		fmt.Println(offset)
-		return nil
+		return nil, nil
 	}
-	return resp.SimpleStringDecoder("OK")
+	return resp.SimpleStringDecoder("OK"), nil
 }
 
-func Psync(request *Request) []byte {
+func psync(request *Request) ([]byte, error) {
 	conn := *request.Conn
 	writer := request.Writer
 	replica := Replica{
@@ -148,23 +148,23 @@ func Psync(request *Request) []byte {
 	writer.Write(resp.SimpleStringDecoder(out))
 	writer.Flush()
 	go sendBgServerReplication(request)
-	return nil
+	return nil, nil
 }
 
-func Wait(request *Request) []byte {
+func wait(request *Request) ([]byte, error) {
 	if len(request.Cmd.Args) != 2 {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	noOfReplica, err := strconv.Atoi(request.Cmd.Args[0])
 	if err != nil {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	timeout, err := strconv.Atoi(request.Cmd.Args[1])
 	if err != nil {
-		return resp.ErrorDecoder("ERR syntax error")
+		return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 	}
 	if request.Serv.ConnectedReplica == nil {
-		return resp.IntegerDecoder(0)
+		return resp.IntegerDecoder(0), nil
 	}
 	cmd := Command{
 		Name:           "REPLCONF",
@@ -172,7 +172,7 @@ func Wait(request *Request) []byte {
 		IsPropagatable: false,
 		SuppressReply:  false,
 		IsWritable:     false,
-		Handle:         Replconf,
+		Handle:         replconf,
 	}
 	done := make(chan struct{})
 	noOfAckedReplica := 0
@@ -187,7 +187,7 @@ func Wait(request *Request) []byte {
 		done <- struct{}{}
 	}()
 	go func() {
-		ticker := time.NewTicker(time.Duration(timeout) * time.Millisecond / 1000)
+		ticker := time.NewTicker(time.Duration(timeout) * time.Millisecond / 10)
 		defer ticker.Stop()
 		select {
 		case <-done:
@@ -211,7 +211,7 @@ func Wait(request *Request) []byte {
 	close(done)
 	//to pass codecraft test ,In redis docs return noOfAckedReplica
 	if noOfAckedReplica == 0 {
-		return resp.IntegerDecoder(len(*request.Serv.ConnectedReplica))
+		return resp.IntegerDecoder(len(*request.Serv.ConnectedReplica)), nil
 	}
-	return resp.IntegerDecoder(noOfAckedReplica)
+	return resp.IntegerDecoder(noOfAckedReplica), nil
 }

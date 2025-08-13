@@ -7,23 +7,23 @@ A Redis server implementation built in Go as part of the . This implementation s
 ### Core Commands
 
 - **PING** - Test server connectivity
-- **ECHO** - Echo back a message
+- **ECHO** - echo back a message
 - **GET** - Retrieve a value by key
 - **SET** - Store a key-value pair with optional expiration
-- **CONFIG GET** - Get configuration values
+- **CONFIG GET** - get configuration values
 - **KEYS** - Find keys matching a pattern
 
 ### Replication Commands
 
-- **INFO** - Get server information (replication status)
+- **INFO** - get server information (replication status)
 - **REPLCONF** - Replication configuration
 - **PSYNC** - Partial synchronization for replication
-- **WAIT** - Wait for replica acknowledgments
+- **WAIT** - wait for replica acknowledgments
 
 ### Advanced Features
 
 - **Master-Slave Replication** - Full master-slave replication support
-- **TTL Support** - Keys can expire after a specified time
+- **TTL Support** - keys can expire after a specified time
 - **RESP Protocol** - Full Redis Serialization Protocol implementation
 - **Concurrent Connections** - Multi-client support with goroutines
 - **RDB File Loading** - Load initial data from Redis RDB files
@@ -165,19 +165,19 @@ master_repl_offset:0
 |---------|--------|-------------|
 | PING | `PING` | Returns PONG |
 | ECHO | `ECHO message` | Returns the message |
-| GET | `GET key` | Get value of key |
+| GET | `GET key` | get value of key |
 | SET | `SET key value [EX seconds] [PX milliseconds] [GET]` | Set key to value with optional expiration |
 | KEYS | `KEYS pattern` | Find keys matching pattern |
-| CONFIG GET | `CONFIG GET parameter` | Get configuration parameter |
+| CONFIG GET | `CONFIG GET parameter` | get configuration parameter |
 
 ### Replication Commands
 
 | Command | Syntax | Description |
 |---------|--------|-------------|
-| INFO | `INFO replication` | Get replication information |
+| INFO | `INFO replication` | get replication information |
 | REPLCONF | `REPLCONF option value` | Configure replication |
 | PSYNC | `PSYNC replicationid offset` | Initiate partial sync |
-| WAIT | `WAIT numreplicas timeout` | Wait for replica acknowledgments |
+| WAIT | `WAIT numreplicas timeout` | wait for replica acknowledgments |
 
 ### SET Command Options
 

@@ -20,7 +20,7 @@ var (
 	ErrInvalidCommand     = errors.New("invalid command")
 )
 
-type HandlerCmd func(request *Request) []byte
+type HandlerCmd func(request *Request) ([]byte, error)
 
 // Declare all maps (uninitialized)
 var (
@@ -41,16 +41,16 @@ type Command struct {
 
 func initCommands() {
 	lookUpCommands = map[string]HandlerCmd{
-		"SET":      Set,
-		"GET":      Get,
-		"ECHO":     Echo,
-		"PING":     Ping,
-		"CONFIG":   Config,
-		"KEYS":     Keys,
-		"INFO":     Info,
-		"PSYNC":    Psync,
-		"REPLCONF": Replconf,
-		"WAIT":     Wait,
+		"SET":      set,
+		"GET":      get,
+		"ECHO":     echo,
+		"PING":     ping,
+		"CONFIG":   config,
+		"KEYS":     keys,
+		"INFO":     info,
+		"PSYNC":    psync,
+		"REPLCONF": replconf,
+		"WAIT":     wait,
 	}
 
 	writeCommand = map[string]bool{
@@ -109,7 +109,6 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	} else {
 		return Command{}, ErrInvalidFormat
 	}
-	fmt.Println(line, parts)
 	cmd, err := decodeCommand(parts)
 
 	if err != nil {
@@ -124,14 +123,14 @@ func ProcessCommand(request *Request) ([]byte, error) {
 	cmd := request.Cmd
 	if handler == nil {
 		return resp.ErrorDecoder("ERR unknown command"), ErrInvalidFormat
-
 	}
-	out := handler(request)
-	serv.Offset += len(encodeCommand(cmd))
-	//if request.Cmd.IsPropagatable {
-
-	//}
+	fmt.Println(cmd, "has been received")
+	out, err := handler(request)
+	if err != nil {
+		return out, err
+	}
 	if cmd.IsPropagatable && serv.ConnectedReplica != nil {
+		request.Serv.Offset += len(encodeCommand(cmd))
 		for _, replica := range *serv.ConnectedReplica {
 			WriteToSlaveBuffer(replica, cmd)
 		}

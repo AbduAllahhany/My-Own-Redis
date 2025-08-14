@@ -75,7 +75,6 @@ func set(request *Request) ([]byte, error) {
 	var oldValue string
 	if returnOldValue {
 		if val, ok := (*store.Dict)[key]; ok {
-			// Check if expired
 			oldValue = val.Value().(string)
 		}
 	}

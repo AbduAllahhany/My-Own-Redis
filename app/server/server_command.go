@@ -2,8 +2,7 @@ package server
 
 import (
 	"bufio"
-	"fmt"
-
+	"bytes"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -117,7 +116,6 @@ func replconf(request *Request) ([]byte, error) {
 			return resp.ErrorDecoder("ERR syntax error"), ErrInvalidFormat
 		}
 		replica.Node.Offset = offset
-		fmt.Println(offset)
 		return nil, nil
 	}
 	return resp.SimpleStringDecoder("OK"), nil
@@ -133,7 +131,10 @@ func psync(request *Request) ([]byte, error) {
 			Reader:        bufio.NewReader(conn),
 			Writer:        bufio.NewWriter(conn),
 		},
-		Buffer: make(chan []byte),
+		Buffer:   bytes.Buffer{},
+		Pending:  false,
+		RDBReady: make(chan struct{}),
+		Ready:    make(chan struct{}),
 	}
 	replicaById[replica.Node.ReplicationId] = &replica
 	if request.Serv.ConnectedReplica == nil {
@@ -143,7 +144,6 @@ func psync(request *Request) ([]byte, error) {
 	} else {
 		*request.Serv.ConnectedReplica = append(*request.Serv.ConnectedReplica, &replica)
 	}
-	request.Serv.Offset = 0
 	out := "FULLRESYNC" + " " + request.Serv.ReplicationId + " " + strconv.Itoa(request.Serv.Offset)
 	writer.Write(resp.SimpleStringDecoder(out))
 	writer.Flush()
@@ -214,4 +214,7 @@ func wait(request *Request) ([]byte, error) {
 		return resp.IntegerDecoder(len(*request.Serv.ConnectedReplica)), nil
 	}
 	return resp.IntegerDecoder(noOfAckedReplica), nil
+}
+func selectIndex(request *Request) ([]byte, error) {
+	return resp.SimpleStringDecoder("OK"), nil
 }

@@ -3,23 +3,16 @@ package server
 import (
 	"bufio"
 	"flag"
-	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/engine"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/utils"
 )
 
-// todo
-// refactor this shittttttttttttttttttttttttttttttttttttttttttttttt
-// implement proper master ,slave ???
-// command ?????????????????????
 var replicaById map[string]*Replica
 var ConfigLookup map[string]string
 
@@ -48,12 +41,6 @@ type Node struct {
 	Conn          *net.Conn
 	Reader        *bufio.Reader
 	Writer        *bufio.Writer
-}
-type Replica struct {
-	Node    Node
-	Buffer  chan []byte
-	RDBDone chan struct{}
-	State   string
 }
 
 func (r Replica) Write(p []byte) (n int, err error) {
@@ -103,36 +90,11 @@ func NewServer(config Configuration) (*Server, error) {
 		Offset:           0,
 		ConnectedReplica: nil,
 	}
+	StartReplicationFlusher()
 	go connectToMaster(&serv, &config)
 	return &serv, nil
 }
-func connectToMaster(serv *Server, config *Configuration) {
-	parts := strings.Split(config.MasterInfo, " ")
-	if len(parts) != 2 {
-		return
-	}
-	masterIp := parts[0]
-	masterPort := parts[1]
-	address := net.JoinHostPort(masterIp, masterPort)
-	_, err := net.ResolveTCPAddr("tcp", address)
-	if err != nil {
-		return
-	}
-	serv.Role = Slave
-	var masterConn net.Conn
-	for {
-		masterConn, err = net.Dial("tcp", address)
-		if err == nil {
-			break
-		}
-	}
-	serv.ConnectedMaster = &Node{
-		Conn:   &masterConn,
-		Reader: bufio.NewReader(masterConn),
-		Writer: bufio.NewWriter(masterConn),
-	}
-	NewSlave(serv)
-}
+
 func NewConfiguration() Configuration {
 	dir := flag.String("dir", "/tmp", "Directory path for data storage")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "Database filename")
@@ -148,7 +110,6 @@ func NewConfiguration() Configuration {
 	return confg
 }
 
-// helper
 func configToMap(config *Configuration) map[string]string {
 	return map[string]string{
 		"dir":        config.Dir,
@@ -198,145 +159,49 @@ func NewSlave(serv *Server) error {
 	reader := node.Reader
 	err := WriteCommand(writer, &pingCmd)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	_, err = reader.ReadString('\n')
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
 	err = WriteCommand(writer, &repliconfPortCmd)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	_, err = reader.ReadString('\n')
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
 	err = WriteCommand(writer, &repliconfCapCmd)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	_, err = reader.ReadString('\n')
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
 	err = WriteCommand(writer, &psyncCmd)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
-	_, err = reader.ReadString('\n')
+	line, err := reader.ReadString('\n')
+
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	_, err = readRDBSnapshot(reader)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
+	line = strings.TrimSuffix(line, "\r\n")
+	parts := strings.Split(line, " ")
+	offsetStr := parts[2]
+	offset, err := strconv.Atoi(offsetStr)
+	serv.Offset = offset
 	go handleMasterConnection(serv)
 	return nil
-}
-func readRDBSnapshot(reader *bufio.Reader) ([]byte, error) {
-	// Read $<len>\r\n
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	lengthStr := strings.TrimSpace(line)[1:] // Remove $ and \r\n
-	length, err := strconv.Atoi(lengthStr)
-	if err != nil {
-		return nil, err
-	}
-
-	if length == -1 {
-		return nil, nil
-	}
-
-	// Read RDB data
-	data := make([]byte, length)
-	_, err = io.ReadFull(reader, data)
-	return data, err
-}
-func sendBgServerReplication(request *Request) {
-	writer := request.Writer
-	rdbDone := make(chan struct{})
-	go func() {
-		rdbData, _ := rdb.GenerateRDBBinary(request.Serv.Db.Dict)
-		lengthLine := fmt.Sprintf("$%d\r\n", len(rdbData))
-		writer.Write([]byte(lengthLine)) // send bulk string header
-		writer.Write(rdbData)
-		writer.Flush()
-		close(rdbDone)
-	}()
-	go func() {
-		<-rdbDone
-		writeBufferToSlave(request)
-	}()
-}
-
-// to be refactored as event loop or smth
-func writeBufferToSlave(request *Request) {
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			for _, replica := range *request.Serv.ConnectedReplica {
-				select {
-				case buf := <-replica.Buffer:
-					replica.Write(buf)
-				default:
-				}
-			}
-		}
-	}
-}
-func WriteToSlaveBuffer(replica *Replica, cmd *Command) {
-	res := encodeCommand(cmd)
-	replica.Buffer <- res
-}
-
-func handleMasterConnection(serv *Server) {
-	master := serv.ConnectedMaster
-	conn := master.Conn
-	reader := master.Reader
-	writer := master.Writer
-	fmt.Println("i am in handle master connection")
-	for {
-		cmd, err := ReadCommand(reader)
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		request := Request{
-			Serv:   serv,
-			Conn:   conn,
-			Reader: reader,
-			Writer: writer,
-			Cmd:    &cmd,
-		}
-		out, err := ProcessCommand(&request)
-		serv.Offset += len(encodeCommand(&cmd))
-		if err != nil {
-			fmt.Println(err)
-		}
-		if !cmd.SuppressReply {
-			writer.Write(out)
-			writer.Flush()
-		}
-	}
 }

@@ -3,7 +3,6 @@ package server
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -51,6 +50,7 @@ func initCommands() {
 		"PSYNC":    psync,
 		"REPLCONF": replconf,
 		"WAIT":     wait,
+		"SELECT":   selectIndex,
 	}
 
 	writeCommand = map[string]bool{
@@ -71,6 +71,7 @@ func initCommands() {
 		"INFO":     true,
 		"PSYNC":    true,
 		"REPLCONF": false,
+		"SELECT":   true,
 	}
 }
 
@@ -102,7 +103,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 		for i := 0; i < noOfParts; i++ {
 			str, err := readBulkString(reader)
 			if err != nil {
-				return Command{}, fmt.Errorf("failed to read bulk string %d: %w", i, err)
+				return Command{}, errors.New("failed to read bulk string")
 			}
 			parts = append(parts, str)
 		}
@@ -124,19 +125,26 @@ func ProcessCommand(request *Request) ([]byte, error) {
 	if handler == nil {
 		return resp.ErrorDecoder("ERR unknown command"), ErrInvalidFormat
 	}
-	fmt.Println(cmd, "has been received")
 	out, err := handler(request)
 	if err != nil {
 		return out, err
 	}
-	if cmd.IsPropagatable && serv.ConnectedReplica != nil {
+	if serv.Role == Master && cmd.IsPropagatable && serv.ConnectedReplica != nil {
 		request.Serv.Offset += len(encodeCommand(cmd))
 		for _, replica := range *serv.ConnectedReplica {
-			WriteToSlaveBuffer(replica, cmd)
+			replica.Buffer.Write(encodeCommand(cmd))
+			queueReplica(replica)
 		}
 	}
 	return out, nil
 }
+func WriteCommand(writer *bufio.Writer, cmd *Command) error {
+	result := encodeCommand(cmd)
+	_, err := writer.Write(result)
+	err = writer.Flush()
+	return err
+}
+
 func decodeCommand(parts []string) (Command, error) {
 	if len(parts) == 0 {
 		return Command{}, ErrEmptyCommand
@@ -159,7 +167,6 @@ func readBulkString(reader *bufio.Reader) (string, error) {
 	//first line
 	line, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println(err)
 		return "", ErrInvalidFormat
 	}
 
@@ -211,10 +218,4 @@ func encodeCommand(cmd *Command) []byte {
 	out := []string{cmd.Name}
 	out = append(out, cmd.Args...)
 	return resp.ArrayDecoder(out)
-}
-func WriteCommand(writer *bufio.Writer, cmd *Command) error {
-	result := encodeCommand(cmd)
-	_, err := writer.Write(result)
-	err = writer.Flush()
-	return err
 }

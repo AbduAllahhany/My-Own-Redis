@@ -38,7 +38,7 @@ type Command struct {
 	Handle         HandlerCmd
 }
 
-func initCommands() {
+func InitCommands() {
 	lookUpCommands = map[string]HandlerCmd{
 		"SET":      set,
 		"GET":      get,
@@ -110,7 +110,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	} else {
 		return Command{}, ErrInvalidFormat
 	}
-	cmd, err := decodeCommand(parts)
+	cmd, err := CreateCommand(parts[0], parts[1:])
 
 	if err != nil {
 		return Command{}, err
@@ -145,23 +145,6 @@ func WriteCommand(writer *bufio.Writer, cmd *Command) error {
 	return err
 }
 
-func decodeCommand(parts []string) (Command, error) {
-	if len(parts) == 0 {
-		return Command{}, ErrEmptyCommand
-	}
-	cmdName := strings.ToUpper(parts[0])
-	cmd := Command{
-		Name:           cmdName,
-		IsPropagatable: propagateCommand[cmdName],
-		SuppressReply:  suppressReplyCommand[cmdName],
-		IsWritable:     writeCommand[cmdName],
-		Handle:         lookUpCommands[strings.ToUpper(parts[0])],
-	}
-	if len(parts) > 1 {
-		cmd.Args = parts[1:]
-	}
-	return cmd, nil
-}
 func readBulkString(reader *bufio.Reader) (string, error) {
 
 	//first line
@@ -218,4 +201,19 @@ func encodeCommand(cmd *Command) []byte {
 	out := []string{cmd.Name}
 	out = append(out, cmd.Args...)
 	return resp.ArrayDecoder(out)
+}
+
+func CreateCommand(name string, args []string) (Command, error) {
+	cmdName := strings.ToUpper(name)
+	if lookUpCommands[cmdName] == nil {
+		return Command{}, errors.New("Invalid Command")
+	}
+	return Command{
+		Name:           cmdName,
+		Args:           args,
+		IsPropagatable: propagateCommand[cmdName],
+		SuppressReply:  suppressReplyCommand[cmdName],
+		IsWritable:     writeCommand[cmdName],
+		Handle:         lookUpCommands[cmdName],
+	}, nil
 }

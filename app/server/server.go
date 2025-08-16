@@ -3,7 +3,10 @@ package server
 import (
 	"bufio"
 	"flag"
+	"fmt"
+	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -61,10 +64,24 @@ type Server struct {
 	ConnectedMaster  *Node
 }
 
+func (serv Server) Run() {
+
+	l := serv.Listener
+	defer l.Close()
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		go handleConnection(&conn, &serv)
+	}
+}
+
 // type shitt
 func NewServer(config Configuration) (*Server, error) {
 	replicaById = make(map[string]*Replica)
-	initCommands()
+	InitCommands()
 	ConfigLookup = configToMap(&config)
 	//create data store instance
 	path := config.Dir + "/" + config.DbFilename
@@ -204,4 +221,39 @@ func NewSlave(serv *Server) error {
 	serv.Offset = offset
 	go handleMasterConnection(serv)
 	return nil
+}
+func handleConnection(connection *net.Conn, serv *Server) {
+	conn := *connection
+	defer conn.Close()
+	defer fmt.Println("connection closed")
+	//create a reader source for this connection
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+	//create connectionId for this conenction
+	connId := utils.GenerateID()
+
+	for {
+		cmd, err := ReadCommand(reader)
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		request := Request{
+			Serv:   serv,
+			Conn:   connection,
+			Reader: reader,
+			Writer: writer,
+			Cmd:    &cmd,
+			ConnId: connId,
+		}
+		out, err := ProcessCommand(&request)
+		if err != nil {
+			fmt.Println(err)
+		}
+		writer.Write(out)
+		writer.Flush()
+	}
 }

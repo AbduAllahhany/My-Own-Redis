@@ -1,1 +1,4 @@
 .idea/
+*.out
+*.log
+coverage_results/

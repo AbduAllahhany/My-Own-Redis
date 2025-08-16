@@ -28,6 +28,19 @@ type RedisList struct {
 func (r RedisList) Type() string {
 	return "LIST"
 }
+func (r RedisList) Value() interface{} {
+	expiration := r.Expiration
+	if expiration.Compare(time.Now()) >= 0 || expiration.IsZero() {
+		return r.Data
+	}
+	return nil
+}
+func (r RedisList) HasExpiration() bool {
+	return !r.Expiration.IsZero()
+}
+func (r RedisList) GetExpiration() time.Time {
+	return r.Expiration
+}
 
 func (r RedisString) Type() string {
 	return "STRING"

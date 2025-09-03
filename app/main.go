@@ -19,6 +19,8 @@ import (
 // 5)Read more about offset tracking and implement this
 // 6)Improve readCommand function
 // 7)server implement reader and writer
+// 8) implement my own radix tree
+// 9)Avoid unnecessary string ↔ byte conversions.
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")

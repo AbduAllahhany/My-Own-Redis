@@ -24,6 +24,29 @@ type RedisList struct {
 	Data       []string
 	Expiration time.Time
 }
+type RedisStream struct {
+	Expiration time.Time
+}
+
+func (r RedisStream) Type() string {
+	return "STREAM"
+}
+
+func (r RedisStream) Value() interface{} {
+	expiration := r.Expiration
+	if expiration.Compare(time.Now()) >= 0 || expiration.IsZero() {
+		return r.Data
+	}
+	return nil
+}
+
+func (r RedisStream) HasExpiration() bool {
+	return !r.Expiration.IsZero()
+}
+
+func (r RedisStream) GetExpiration() time.Time {
+	return r.Expiration
+}
 
 func (r RedisList) Type() string {
 	return "LIST"
